@@ -57,33 +57,21 @@ class Ouragent():
         # run a alpha beta prunning minimax search that use neural network as heuristic provider
         # print(f"{self.colour} making move")
         if self.colour == "B" and self.turn_count == 0:
-            if :
+            if :#use existing research results to decide
                 self.s.sendall(bytes("SWAP\n", "utf-8"))
             else:
-                # same as below
-                choices = []
-                for i in range(self.board_size):
-                    for j in range(self.board_size):
-                        if self.board[i][j] == 0:
-                            choices.append((i, j))
-                pos = choice(choices)
+                #use existing research results to get a position that take the longest to lose/win
+                pos = []
                 self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
                 self.board[pos[0]][pos[1]] = self.colour
         else:
-            choices = []
-            for i in range(self.board_size):
-                for j in range(self.board_size):
-                    if self.board[i][j] == 0:
-                        choices.append((i, j))
-            pos = choice(choices)
+            # put the tree search here
+            pos = []
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
             self.board[pos[0]][pos[1]] = self.colour
         self.turn_count += 1
 
     def opp_colour(self):
-        """Returns the char representation of the colour opposite to the
-        current one.
-        """
         if self.colour == "R":
             return "B"
         elif self.colour == "B":

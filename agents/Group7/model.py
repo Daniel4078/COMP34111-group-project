@@ -1,6 +1,13 @@
-import numpy as np
-import tensorflow as tf
 from keras import layers, models
+import tensorflow as tf
+import numpy as np
+
+import sys
+sys.path.append(r"C:\\Users\\ttt\\Desktop\\COMP34111-group-project\\src")
+
+from Game import Game
+from Colour import Colour
+
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
@@ -12,6 +19,21 @@ min_epsilon = 0.01
 # 1 represents Player 1, and 2 represents Player 2.
 
 # Function to choose an action using epsilon-greedy policy
+
+def tile_to_state(tile):
+    colour = tile.get_colour()
+    if colour == Colour.RED:
+        return 1  # Assuming RED represents Player 1
+    elif colour == Colour.BLUE:
+        return 2  # Assuming BLUE represents Player 2
+    else:
+        return 0  # Assuming None or another value represents an empty tile
+    
+    
+def board_to_state(board_tiles):
+    return np.array([[tile_to_state(tile) for tile in row] for row in board_tiles])
+
+
 def choose_action(state, epsilon):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
@@ -22,6 +44,8 @@ def choose_action(state, epsilon):
         return np.argmax(Q_values[0])
 
 # Function to update Q-values using Q-learning update rule
+
+
 def update_q_values(state, action, reward, next_state, done):
     target = reward
     if not done:
@@ -32,27 +56,34 @@ def update_q_values(state, action, reward, next_state, done):
     Q_values[0, action] = target
     return Q_values
 
+
 # Define the neural network architecture with two outputs
 model = models.Sequential([
     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(11, 11, 1)),
     layers.Flatten(),
     layers.Dense(64, activation='relu'),
-    layers.Dense(121, activation='linear', name='q_values'),  # Output for Q-values
+    # Output for Q-values
+    layers.Dense(121, activation='linear', name='q_values'),
     # layers.Dense(1, activation='sigmoid', name='winning_rate')  # Output for winning rate
 ])
 
 # Compile the model with multiple losses
 model.compile(optimizer='adam',
-            #   loss={'q_values': 'mean_squared_error', 'winning_rate': 'binary_crossentropy'},
+              #   loss={'q_values': 'mean_squared_error', 'winning_rate': 'binary_crossentropy'},
               loss={'q_values': 'mean_squared_error'},
               loss_weights={'q_values': 1.0})
-            #   loss_weights={'q_values': 1.0, 'winning_rate': 0.5})
+#   loss_weights={'q_values': 1.0, 'winning_rate': 0.5})
 
 # Training parameters
-num_episodes = 10
+num_episodes = 1
 
 for episode in range(num_episodes):
-    state = np.random.randint(0, 3, size=(11, 11))
+    game = Game(board_size=11)
+    tiles = game.get_board().get_tiles()
+    state = board_to_state(tiles)
+    print(state)
+
+    state = game.get_board().get_state()
     state = state.reshape((1, 11, 11, 1))
     total_reward = 0
 
@@ -70,7 +101,8 @@ for episode in range(num_episodes):
         reward = 1  # Placeholder reward, you need to define the reward based on game rules
 
         # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values(state, action, reward, next_state, step == 120)
+        Q_values = update_q_values(
+            state, action, reward, next_state, step == 120)
 
         # Train the model on the updated Q-values
         model.train_on_batch(state.reshape((1, 11, 11, 1)), Q_values)

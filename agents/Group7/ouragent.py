@@ -58,7 +58,8 @@ class Ouragent():
         return False
 
     def swap_map(self):
-
+        # if position is in the center according to map then swap
+        # else not swap
         return False
 
     def make_move(self):
@@ -67,17 +68,22 @@ class Ouragent():
         if self.colour == "B" and self.turn_count == 0:
             if self.swap_map():  # use existing research results to decide
                 self.s.sendall(bytes("SWAP\n", "utf-8"))
-            else:
-                # use existing research results to get a position that take the longest to lose/win
-                pos = []
-                self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
-                self.board[pos[0]][pos[1]] = self.colour
-        else:
-            depth = 4
-            best_score, best_move = self.minimax(self.board, depth, True, float('-inf'), float('inf'))
+                self.turn_count += 1
+                return
+                #
+        if self.colour == "R" and self.turn_count == 0:
+            # use existin research result to choose a node that would take the longest to win if opponent swap
+            # aka a node that is at the boundary of first moves that are winning and not
             pos = []
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
             self.board[pos[0]][pos[1]] = self.colour
+            self.turn_count += 1
+            return
+        depth = 4
+        best_score, pos = self.minimax(self.board, depth, True, float('-inf'), float('inf'))
+        pos = []
+        self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
+        self.board[pos[0]][pos[1]] = self.colour
         self.turn_count += 1
 
     def minimax(self, board, depth, maximizing_player, alpha, beta):

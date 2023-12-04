@@ -1,3 +1,4 @@
+import random
 from keras import layers, models
 import tensorflow as tf
 import numpy as np
@@ -32,6 +33,22 @@ def tile_to_state(tile):
     
 def board_to_state(board_tiles):
     return np.array([[tile_to_state(tile) for tile in row] for row in board_tiles])
+
+
+def calculate_reward(game, action, previous_state, agent_color):
+    tiles = game.get_board().get_tiles()
+    current_state = board_to_state(tiles)
+    row, col = divmod(action, 11)
+
+    if game.get_board().has_ended():
+        if game.get_board().get_winner() == agent_color:  # Assuming the agent is RED
+            return 10  # Positive reward for winning
+        else:
+            return -10  # Negative reward for losing
+    elif previous_state[row, col] != 0:
+        return -5  # Penalty for invalid moves
+    return 1  # Progressive reward, which needs to be improved. 
+              # We need to assign reward when it extend the longest chain.
 
 
 def choose_action(state, epsilon):
@@ -79,36 +96,42 @@ num_episodes = 1
 
 for episode in range(num_episodes):
     game = Game(board_size=11)
+    agent_color = random.choice([Colour.RED, Colour.BLUE])
+    
     tiles = game.get_board().get_tiles()
     state = board_to_state(tiles)
     print(state)
-
-    state = game.get_board().get_state()
+    
     state = state.reshape((1, 11, 11, 1))
     total_reward = 0
 
     for step in range(121):  # Maximum number of steps in a Hex game
+        previous_state = state.copy().reshape((11, 11))
         action = choose_action(state, epsilon)
-        next_state = state.copy()
+        
         row, col = divmod(action, 11)
-        if next_state[0, row, col, 0] == 0:  # Check if the chosen cell is empty
-            next_state[0, row, col, 0] = 1  # Assume Player 1 makes a move
-        else:
-            continue  # Invalid move, choose a different action
+        if previous_state[row, col] != 0:  # Check if the cell is already occupied
+            continue  # Invalid move, skip to the next iteration
+        
+        game.get_board().set_tile_colour(row, col, agent_color)
 
-        # Simulate the environment and get the reward
-        # In a real scenario, you would interact with the actual Hex game environment
-        reward = 1  # Placeholder reward, you need to define the reward based on game rules
+        reward = calculate_reward(game, action, previous_state, agent_color)
+        next_state = board_to_state(game.get_board().get_tiles())
+        next_state = next_state.reshape((1, 11, 11, 1))
 
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
-            state, action, reward, next_state, step == 120)
+            state, action, reward, next_state, game.get_board().has_ended())
 
         # Train the model on the updated Q-values
         model.train_on_batch(state.reshape((1, 11, 11, 1)), Q_values)
 
         total_reward += reward
         state = next_state
+        
+        if game.get_board().has_ended():
+            print(state.reshape((1, 11, 11, 1)))
+            break
 
     # Decay epsilon for exploration-exploitation trade-off
     epsilon *= epsilon_decay

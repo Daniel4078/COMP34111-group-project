@@ -57,19 +57,23 @@ class Ouragent():
                     self.make_move()
         return False
 
+    def swap_map(self):
+
+        return False
+
     def make_move(self):
         # run a alpha beta prunning minimax search that use neural network as heuristic provider
         # print(f"{self.colour} making move")
         if self.colour == "B" and self.turn_count == 0:
-            if :#use existing research results to decide
+            if self.swap_map():  # use existing research results to decide
                 self.s.sendall(bytes("SWAP\n", "utf-8"))
             else:
-                #use existing research results to get a position that take the longest to lose/win
+                # use existing research results to get a position that take the longest to lose/win
                 pos = []
                 self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
                 self.board[pos[0]][pos[1]] = self.colour
         else:
-            depth=4
+            depth = 4
             best_score, best_move = self.minimax(self.board, depth, True, float('-inf'), float('inf'))
             pos = []
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
@@ -96,7 +100,7 @@ class Ouragent():
         else:
             min_eval = float('inf')
             best_move = None
-            for move in self.get_possible_moves(board, self.opp_colour()):
+            for move in self.get_possible_moves(board):
                 board_copy = self.make_move_copy(board, move, self.opp_colour())
                 eval, _ = self.minimax(board_copy, depth - 1, True, alpha, beta)
                 if eval < min_eval:
@@ -107,16 +111,16 @@ class Ouragent():
                     break
             return min_eval, best_move
 
-    def evaluate_board(self, tiles):#TODO: adoptation to different board sizes
+    def evaluate_board(self, tiles):  # TODO: adoptation to different board sizes
         condense = Board(board_size=6)
         for a in range(6):
             for b in range(6):
-                part=[]
+                part = []
                 for i in range(6):
-                    part.append(tiles[a+i][b:b+6])
+                    part.append(tiles[a + i][b:b + 6])
                 state = model.board_to_state(part)
                 Q_values = model.predict(state.reshape((1, 6, 6, 1)))
-                if np.argmax(Q_values[0]) > 0: #TODO: 优势劣势的分界线在哪？
+                if np.argmax(Q_values[0]) > 0:  # TODO: 优势劣势的分界线在哪？
                     condense.set_tile_colour(a, b, self.colour)
                 else:
                     condense.set_tile_colour(a, b, self.opp_colour())
@@ -124,13 +128,13 @@ class Ouragent():
         Q_values = model.predict(state.reshape((1, 6, 6, 1)))
         return np.argmax(Q_values[0])
 
-    def get_possible_moves(self, board, colour):
-            moves = []
-            for x in range(self.board_size):
-                for y in range(self.board_size):
-                    if board[x][y] == 0:
-                        moves.append((x, y))
-            return moves
+    def get_possible_moves(self, board):
+        moves = []
+        for x in range(self.board_size):
+            for y in range(self.board_size):
+                if board[x][y] == 0:
+                    moves.append((x, y))
+        return moves
 
     def opp_colour(self):
         if self.colour == "R":

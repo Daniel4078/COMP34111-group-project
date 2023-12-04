@@ -1,5 +1,9 @@
 import socket
 from random import choice
+import model
+from Board import Board
+from Colour import Colour
+import numpy as np
 
 
 class Ouragent():
@@ -65,11 +69,68 @@ class Ouragent():
                 self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
                 self.board[pos[0]][pos[1]] = self.colour
         else:
-            # put the tree search here
+            depth=4
+            best_score, best_move = self.minimax(self.board, depth, True, float('-inf'), float('inf'))
             pos = []
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
             self.board[pos[0]][pos[1]] = self.colour
         self.turn_count += 1
+
+    def minimax(self, board, depth, maximizing_player, alpha, beta):
+        if depth == 0 or board.has_ended():
+            return self.evaluate_board(board), None
+
+        if maximizing_player:
+            max_eval = float('-inf')
+            best_move = None
+            for move in self.get_possible_moves(board, self.colour):
+                board_copy = self.make_move_copy(board, move, self.colour)
+                eval, _ = self.minimax(board_copy, depth - 1, False, alpha, beta)
+                if eval > max_eval:
+                    max_eval = eval
+                    best_move = move
+                alpha = max(alpha, eval)
+                if beta <= alpha:
+                    break
+            return max_eval, best_move
+        else:
+            min_eval = float('inf')
+            best_move = None
+            for move in self.get_possible_moves(board, self.opp_colour()):
+                board_copy = self.make_move_copy(board, move, self.opp_colour())
+                eval, _ = self.minimax(board_copy, depth - 1, True, alpha, beta)
+                if eval < min_eval:
+                    min_eval = eval
+                    best_move = move
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break
+            return min_eval, best_move
+
+    def evaluate_board(self, tiles):#TODO: adoptation to different board sizes
+        condense = Board(board_size=6)
+        for a in range(6):
+            for b in range(6):
+                part=[]
+                for i in range(6):
+                    part.append(tiles[a+i][b:b+6])
+                state = model.board_to_state(part)
+                Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+                if np.argmax(Q_values[0]) > 0: #TODO: 优势劣势的分界线在哪？
+                    condense.set_tile_colour(a, b, self.colour)
+                else:
+                    condense.set_tile_colour(a, b, self.opp_colour())
+        state = model.board_to_state(condense.get_tiles())
+        Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+        return np.argmax(Q_values[0])
+
+    def get_possible_moves(self, board, colour):
+            moves = []
+            for x in range(self.board_size):
+                for y in range(self.board_size):
+                    if board[x][y] == 0:
+                        moves.append((x, y))
+            return moves
 
     def opp_colour(self):
         if self.colour == "R":

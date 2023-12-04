@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 
 import sys
-sys.path.append(r"D:\Programming\COMP34111-group-project\src")
+sys.path.append(r"D:\COMP34111-group-project\src")
 
 from Game import Game
 from Colour import Colour
@@ -38,7 +38,7 @@ def board_to_state(board_tiles):
 def calculate_reward(game, action, previous_state, agent_color):
     tiles = game.get_board().get_tiles()
     current_state = board_to_state(tiles)
-    row, col = divmod(action, 11)
+    row, col = divmod(action, 6)
 
     if game.get_board().has_ended():
         if game.get_board().get_winner() == agent_color:  # Assuming the agent is RED
@@ -54,10 +54,10 @@ def calculate_reward(game, action, previous_state, agent_color):
 def choose_action(state, epsilon):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
-        return np.random.randint(0, 121)
+        return np.random.randint(0, 36)
     else:
         # Exploit - choose the action with the highest Q-value
-        Q_values = model.predict(state.reshape((1, 11, 11, 1)))
+        Q_values = model.predict(state.reshape((1, 6, 6, 1)))
         return np.argmax(Q_values[0])
 
 # Function to update Q-values using Q-learning update rule
@@ -66,20 +66,20 @@ def choose_action(state, epsilon):
 def update_q_values(state, action, reward, next_state, done):
     target = reward
     if not done:
-        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)))
+        Q_values_next = model.predict(next_state.reshape((1, 6, 6, 1)))
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 6, 6, 1)))
     Q_values[0, action] = target
     return Q_values
 
 
 # Define the neural network architecture with two outputs
 model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(11, 11, 1)),
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
     layers.Flatten(),
     layers.Dense(64, activation='relu'),
     # Output for Q-values
-    layers.Dense(121, activation='linear', name='q_values'),
+    layers.Dense(36, activation='linear', name='q_values'),
     # layers.Dense(1, activation='sigmoid', name='winning_rate')  # Output for winning rate
 ])
 

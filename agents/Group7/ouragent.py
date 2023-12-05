@@ -66,15 +66,17 @@ class Ouragent():
         # run a alpha beta prunning minimax search that use neural network as heuristic provider
         # print(f"{self.colour} making move")
         if self.colour == "B" and self.turn_count == 0:
-            if self.swap_map():  # use existing research results to decide
+            if self.swap_map():  # use existing research results to decide swap or not
                 self.s.sendall(bytes("SWAP\n", "utf-8"))
                 self.turn_count += 1
                 return
-                #
         if self.colour == "R" and self.turn_count == 0:
-            # use existin research result to choose a node that would take the longest to win if opponent swap
+            # use existing research result to choose a node that would take the longest to win if opponent swap
             # aka a node that is at the boundary of first moves that are winning and not
-            pos = []
+            good_choices=[[1,2],[2,0],[3,0],[5,0],[6,0],[7,0],[8,0],[10,0],[2,5],[1,8],[0,10]]
+            pos = choice(good_choices)
+            if choice([0, 1]) == 1:
+                pos = [pos[1], pos[0]]
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
             self.board[pos[0]][pos[1]] = self.colour
             self.turn_count += 1

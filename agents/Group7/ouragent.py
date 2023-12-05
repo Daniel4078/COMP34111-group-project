@@ -1,6 +1,8 @@
 import socket
-from random import choice
-import model
+import random
+# import model
+import sys
+sys.path.append("C:/Users/user/Desktop/COMP34111-group-project-master/src")
 from Board import Board
 from Colour import Colour
 import numpy as np
@@ -53,7 +55,10 @@ class Ouragent():
                         self.make_move()
                 elif s[3] == self.colour:
                     action = [int(x) for x in s[1].split(",")]
-                    self.board.set_tile_colour(action[0], action[1], self.opp_colour())
+                    print(action)
+                    self.board.set_tile_colour(action[0], action[1], Colour.from_char(self.opp_colour()))
+                    print("current")
+                    print(self.board.print_board())
                     self.last_move = action
                     self.make_move()
         return False
@@ -82,59 +87,58 @@ class Ouragent():
             # use existing research result to choose a node that would take the longest to win if opponent swap
             # aka a node that is at the boundary of first moves that are winning and not
             good_choices = [[1, 2], [2, 0], [3, 0], [5, 0], [6, 0], [7, 0], [8, 0], [10, 0], [2, 5], [1, 8], [0, 10]]
-            pos = choice(good_choices)
-            if choice([0, 1]) == 1:
+            pos = random.choice(good_choices)
+            if random.choice([0, 1]) == 1:
                 pos = [pos[1], pos[0]]
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
-            self.board.set_tile_colour(pos[0], pos[1], self.colour)
+            self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
             self.last_move = pos
             self.turn_count += 1
             return
-        depth = 4
-        best_score, pos = self.minimax(self.board, depth, True, float('-inf'), float('inf'))
+        best_score, pos = self.minimax(self.board, 2, True, float('-inf'), float('inf'))
         self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
-        self.board.set_tile_colour(pos[0], pos[1], self.colour)
+        self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
+        print(self.board.print_board())
         self.last_move = pos
         self.turn_count += 1
 
-    def make_move_copy(self, tiles, move, colour):
-        tiles_copy = [row[:] for row in tiles]
-        tiles_copy[move[0]][move[1]] = colour
-        return tiles_copy
+    def make_move_copy(self, board, move, colour):
+        temp = board.print_board()
+        board_copy=Board.from_string(temp)
+        board_copy.set_tile_colour(move[0], move[1], Colour.from_char(colour))
+        return board_copy
 
     def minimax(self, board, depth, maximizing_player, alpha, beta):
         if depth == 0 or board.has_ended():
-            return self.evaluate_board(board), None
+            return self.evaluate_board(board.get_tiles()), None
 
         if maximizing_player:
             max_eval = float('-inf')
             best_move = None
             for move in self.get_possible_moves(board.get_tiles()):
-                board_copy=Board()
-                tiles_copy= self.make_move_copy(board, move, self.colour)
-                board_copy._tiles = tiles_copy
-                eval, _ = self.minimax(board_copy, depth - 1, False, alpha, beta)
+                newboard= self.make_move_copy(board, move, self.colour)
+                eval, _ = self.minimax(newboard, depth - 1, False, alpha, beta)
                 if eval > max_eval:
                     max_eval = eval
                     best_move = move
                 alpha = max(alpha, eval)
                 if beta <= alpha:
                     break
+            print(best_move)
             return max_eval, best_move
         else:
             min_eval = float('inf')
             best_move = None
             for move in self.get_possible_moves(board.get_tiles()):
-                board_copy=Board()
-                tiles_copy= self.make_move_copy(board, move, self.colour)
-                board_copy._tiles = tiles_copy
-                eval, _ = self.minimax(board_copy, depth - 1, True, alpha, beta)
+                newboard= self.make_move_copy(board, move, self.opp_colour())
+                eval, _ = self.minimax(newboard, depth - 1, True, alpha, beta)
                 if eval < min_eval:
                     min_eval = eval
                     best_move = move
                 beta = min(beta, eval)
                 if beta <= alpha:
                     break
+            print(best_move)
             return min_eval, best_move
 
     def evaluate_board(self, tiles):  # TODO: adoptation to different board sizes
@@ -144,21 +148,23 @@ class Ouragent():
                 part = []
                 for i in range(6):
                     part.append(tiles[a + i][b:b + 6])
-                state = model.board_to_state(part)
-                Q_values = model.predict(state.reshape((1, 6, 6, 1)))
-                if np.argmax(Q_values[0]) > 0:  # TODO: 优势劣势的分界线在哪？
-                    condense.set_tile_colour(a, b, self.colour)
-                else:
-                    condense.set_tile_colour(a, b, self.opp_colour())
-        state = model.board_to_state(condense.get_tiles())
-        Q_values = model.predict(state.reshape((1, 6, 6, 1)))
-        return np.argmax(Q_values[0])
+                # state = model.board_to_state(part)
+                # Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+                score = 1
+                if score > 2:  # TODO: 优势劣势的分界线在哪？
+                    condense.set_tile_colour(a, b, Colour.from_char(self.colour))
+                elif score < -2:
+                    condense.set_tile_colour(a, b, Colour.from_char(self.opp_colour()))
+        # state = model.board_to_state(condense.get_tiles())
+        #Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+        score = 1
+        return score
 
     def get_possible_moves(self, tiles):
         moves = []
         for x in range(self.board_size):
             for y in range(self.board_size):
-                if tiles[x][y] == 0:
+                if tiles[x][y].get_colour() is None:
                     moves.append((x, y))
         return moves
 

@@ -42,7 +42,7 @@ def calculate_reward(game, agent_color):
             return -10  # Negative reward for losing
 
 
-def choose_action(state, epsilon):
+def choose_action(state, epsilon, model):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
         return np.random.randint(0, 36)
@@ -53,7 +53,7 @@ def choose_action(state, epsilon):
 
 
 # Function to update Q-values using Q-learning update rule
-def update_q_values(state, action, reward, done):
+def update_q_values(state, action, States, reward, done, model):
     target = reward
     if not done:
         next_state = States[move_num + 1]
@@ -81,22 +81,22 @@ model.compile(optimizer='adam',
               loss_weights={'q_values': 1.0})
 #   loss_weights={'q_values': 1.0, 'winning_rate': 0.5})
 
-# # Define the neural network architecture
-# model2 = models.Sequential([
-#     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
-#     layers.Flatten(),
-#     layers.Dense(64, activation='relu'),
-#     layers.Dense(36, activation='linear', name='q_values'),
-# ])
+# Define the second neural network architecture
+model2 = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
+    layers.Flatten(),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(36, activation='linear', name='q_values'),
+])
 
-# # Compile the model with loss
-# model2.compile(optimizer='adam',
-#               loss={'q_values': 'mean_squared_error'},
-#               loss_weights={'q_values': 1.0})
+# Compile the model with loss
+model2.compile(optimizer='adam',
+              loss={'q_values': 'mean_squared_error'},
+              loss_weights={'q_values': 1.0})
 
 
 # Training parameters
-num_episodes = 30
+num_episodes = 100
 win = 0
 
 for episode in range(num_episodes):
@@ -113,16 +113,20 @@ for episode in range(num_episodes):
     tiles = game.get_board().get_tiles()
     state = board_to_state(tiles)
     state = state.reshape((1, 6, 6, 1))
-    total_reward = 0
 
+    total_reward = 0
+    
     # To store every board state during one game
     States = []
     Actions = []
 
+    States2 = []
+    Actions2 = []
+
     while True:
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
-            action = choose_action(state, epsilon)
+            action = choose_action(state, epsilon, model)
             row, col = divmod(action, 6)
             if state.reshape(6,6)[row, col] != 0:  # Check if the cell is already occupied
                 continue  # Invalid move, skip to the next iteration
@@ -144,7 +148,7 @@ for episode in range(num_episodes):
         start = False
         # Player2 
         while True:
-            action2 = np.random.randint(0, 36)
+            action2 = choose_action(state, epsilon, model2)
             row, col = divmod(action2, 6)
             if state.reshape(6,6)[row, col] == 0:
                 game.get_board().set_tile_colour(row, col, player2)
@@ -154,6 +158,10 @@ for episode in range(num_episodes):
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 6, 6, 1))
 
+        # Add the action and state 
+        States2.append(state)
+        Actions2.append(action2)
+
         if game.get_board().has_ended():
             break
 
@@ -162,12 +170,21 @@ for episode in range(num_episodes):
     for move_num in range(len(States) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
-            States[move_num], Actions[move_num], (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States))
+            States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
         
         # Train the model on the updated Q-values
         model.train_on_batch(States[move_num].reshape((1, 6, 6, 1)), Q_values)
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
+
+    # Train the second model
+    for move_num in range(len(States2) - 1, -1, -1):
+        # Update Q-values using the Q-learning update rule
+        Q_values2 = update_q_values(
+            States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
+        
+        # Train the model on the updated Q-values
+        model2.train_on_batch(States2[move_num].reshape((1, 6, 6, 1)), Q_values2)
 
     print(Q_values)
     print(state.reshape(6,6))

@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 
 import sys
-sys.path.append(r"D:\COMP34111-group-project\src")
+sys.path.append(r"D:\Programming\COMP34111-group-project\src")
 
 from Game import Game
 from Colour import Colour
@@ -20,7 +20,6 @@ min_epsilon = 0.01
 # 1 represents Player 1, and 2 represents Player 2.
 
 # Function to choose an action using epsilon-greedy policy
-
 def tile_to_state(tile):
     colour = tile.get_colour()
     if colour == Colour.RED:
@@ -35,20 +34,12 @@ def board_to_state(board_tiles):
     return np.array([[tile_to_state(tile) for tile in row] for row in board_tiles])
 
 
-def calculate_reward(game, action, previous_state, agent_color):
-    tiles = game.get_board().get_tiles()
-    current_state = board_to_state(tiles)
-    row, col = divmod(action, 6)
-
+def calculate_reward(game, agent_color):
     if game.get_board().has_ended():
-        if game.get_board().get_winner() == agent_color:  # Assuming the agent is RED
+        if game.get_board().get_winner() == agent_color:
             return 10  # Positive reward for winning
         else:
             return -10  # Negative reward for losing
-    elif previous_state[row, col] != 0:
-        return -5  # Penalty for invalid moves
-    return 0.001  # Progressive reward, which needs to be improved. 
-              # We need to assign reward when it extend the longest chain.
 
 
 def choose_action(state, epsilon):
@@ -60,12 +51,12 @@ def choose_action(state, epsilon):
         Q_values = model.predict(state.reshape((1, 6, 6, 1)))
         return np.argmax(Q_values[0])
 
+
 # Function to update Q-values using Q-learning update rule
-
-
-def update_q_values(state, action, reward, next_state, done):
+def update_q_values(state, action, reward, done):
     target = reward
     if not done:
+        next_state = States[move_num + 1]
         Q_values_next = model.predict(next_state.reshape((1, 6, 6, 1)))
         target += gamma * np.max(Q_values_next[0])
     Q_values = model.predict(state.reshape((1, 6, 6, 1)))
@@ -73,7 +64,7 @@ def update_q_values(state, action, reward, next_state, done):
     return Q_values
 
 
-# Define the neural network architecture with two outputs
+# Define the neural network architecture
 model = models.Sequential([
     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
     layers.Flatten(),
@@ -83,82 +74,114 @@ model = models.Sequential([
     # layers.Dense(1, activation='sigmoid', name='winning_rate')  # Output for winning rate
 ])
 
-# Compile the model with multiple losses
+# Compile the model with loss
 model.compile(optimizer='adam',
               #   loss={'q_values': 'mean_squared_error', 'winning_rate': 'binary_crossentropy'},
               loss={'q_values': 'mean_squared_error'},
               loss_weights={'q_values': 1.0})
 #   loss_weights={'q_values': 1.0, 'winning_rate': 0.5})
 
+# # Define the neural network architecture
+# model2 = models.Sequential([
+#     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
+#     layers.Flatten(),
+#     layers.Dense(64, activation='relu'),
+#     layers.Dense(36, activation='linear', name='q_values'),
+# ])
+
+# # Compile the model with loss
+# model2.compile(optimizer='adam',
+#               loss={'q_values': 'mean_squared_error'},
+#               loss_weights={'q_values': 1.0})
+
+
 # Training parameters
-num_episodes = 1
+num_episodes = 30
+win = 0
 
 for episode in range(num_episodes):
-    game = Game(board_size=11)
+    # Initialization
+    game = Game(board_size=6)
+
     agent_color = random.choice([Colour.RED, Colour.BLUE])
     if agent_color == Colour.RED:
         player2 = Colour.BLUE
     else:
         player2 = Colour.RED
     
+    start = True
     tiles = game.get_board().get_tiles()
     state = board_to_state(tiles)
-    
-    state = state.reshape((1, 11, 11, 1))
+    state = state.reshape((1, 6, 6, 1))
     total_reward = 0
 
+    # To store every board state during one game
+    States = []
+    Actions = []
+
     while True:
-        previous_state = state.copy().reshape((11, 11))
-        action = choose_action(state, epsilon)
-        
-        row, col = divmod(action, 11)
-        if previous_state[row, col] != 0:  # Check if the cell is already occupied
-            continue  # Invalid move, skip to the next iteration
-        
-        # Make move
-        game.get_board().set_tile_colour(row, col, agent_color)
+        # Let Red starts first
+        if agent_color == Colour.RED or start == False:
+            action = choose_action(state, epsilon)
+            row, col = divmod(action, 6)
+            if state.reshape(6,6)[row, col] != 0:  # Check if the cell is already occupied
+                continue  # Invalid move, skip to the next iteration
+            
+            # Make move
+            game.get_board().set_tile_colour(row, col, agent_color)
 
-        # Store the state after player1 move
-        next_state = board_to_state(game.get_board().get_tiles())
-        next_state = next_state.reshape((1, 11, 11, 1))
+            # Store the state after player1 move
+            state = board_to_state(game.get_board().get_tiles())
+            state = state.reshape((1, 6, 6, 1))
 
+            # Add the action and state 
+            States.append(state)
+            Actions.append(action)
+
+            if game.get_board().has_ended():
+                break
+
+        start = False
         # Player2 
         while True:
-            action2 = np.random.randint(0, 121)
-            row, col = divmod(action2, 11)
-            if state.reshape(11,11)[row, col] == 0:
+            action2 = np.random.randint(0, 36)
+            row, col = divmod(action2, 6)
+            if state.reshape(6,6)[row, col] == 0:
                 game.get_board().set_tile_colour(row, col, player2)
                 break
 
         # Store the state after player2 move
-        next_state2 = board_to_state(game.get_board().get_tiles())
-        next_state2 = next_state2.reshape((1, 11, 11, 1))
+        state = board_to_state(game.get_board().get_tiles())
+        state = state.reshape((1, 6, 6, 1))
 
-        # Give reward
-        reward = calculate_reward(game, action, previous_state, agent_color)
-        
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values(
-            state, action, reward, next_state, game.get_board().has_ended())
-
-        # Train the model on the updated Q-values
-        model.train_on_batch(state.reshape((1, 11, 11, 1)), Q_values)
-
-        total_reward += reward
-        state = next_state2
-
-        
-        
         if game.get_board().has_ended():
-            print(state.reshape(11,11))
             break
 
+    # Give reward
+    reward = calculate_reward(game, agent_color)
+    for move_num in range(len(States) - 1, -1, -1):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values(
+            States[move_num], Actions[move_num], (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States))
+        
+        # Train the model on the updated Q-values
+        model.train_on_batch(States[move_num].reshape((1, 6, 6, 1)), Q_values)
+
+        total_reward += 0.9**(len(States) - move_num - 1) * reward
+
+    print(Q_values)
+    print(state.reshape(6,6))
     # Decay epsilon for exploration-exploitation trade-off
     epsilon *= epsilon_decay
     epsilon = max(min_epsilon, epsilon)
 
+    # Record the winning number
+    if game.get_board().get_winner() == agent_color:
+        win += 1
+    
     print(f"Episode: {episode + 1}, Total Reward: {total_reward}, Agent Colour: {agent_color}")
     print(f"Winner: {game.get_board().get_winner()}")
 
+print(f"Winning rate: {win/(episode+1)}")
 # Save the trained model for future use
 # model.save('hex_agent_model.h5')

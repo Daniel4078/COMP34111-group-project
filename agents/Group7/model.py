@@ -200,5 +200,6 @@ for episode in range(num_episodes):
     print(f"Winner: {game.get_board().get_winner()}")
 
 print(f"Winning rate: {win/(episode+1)}")
+
 # Save the trained model for future use
-# model.save('hex_agent_model.h5')
+model.save('hex_agent_model.keras')

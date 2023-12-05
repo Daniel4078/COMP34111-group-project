@@ -16,9 +16,10 @@ class Ouragent():
         )
         self.s.connect((self.HOST, self.PORT))
         self.board_size = board_size
-        self.board = []
+        self.board = Board(self.board_size)
         self.colour = ""
         self.turn_count = 0
+        self.last_move = None
 
     def run(self):
         while True:
@@ -38,8 +39,7 @@ class Ouragent():
             if s[0] == "START":
                 self.board_size = int(s[1])
                 self.colour = s[2]
-                self.board = [
-                    [0] * self.board_size for i in range(self.board_size)]
+                self.board = Board(self.board_size)
                 if self.colour == "R":
                     self.make_move()
             elif s[0] == "END":
@@ -53,17 +53,25 @@ class Ouragent():
                         self.make_move()
                 elif s[3] == self.colour:
                     action = [int(x) for x in s[1].split(",")]
-                    self.board[action[0]][action[1]] = self.opp_colour()
+                    self.board.set_tile_colour(action[0], action[1], self.opp_colour())
+                    self.last_move = action
                     self.make_move()
         return False
 
     def swap_map(self):
-        # if position is in the center according to map then swap
-        # else not swap
+        x = self.last_move[0]
+        y = self.last_move[1]
+        if 1 < x < 9 and 0 < y < 10:
+            return True
+        if x == 9 and (y == 0 or y == 1):
+            return True
+        if x == 1 and (y == 9 or y == 10):
+            return True
+        if (x == 10 and y == 0) or (x == 0 and y == 10):
+            return True
         return False
 
     def make_move(self):
-        # run a alpha beta prunning minimax search that use neural network as heuristic provider
         # print(f"{self.colour} making move")
         if self.colour == "B" and self.turn_count == 0:
             if self.swap_map():  # use existing research results to decide swap or not
@@ -73,20 +81,26 @@ class Ouragent():
         if self.colour == "R" and self.turn_count == 0:
             # use existing research result to choose a node that would take the longest to win if opponent swap
             # aka a node that is at the boundary of first moves that are winning and not
-            good_choices=[[1,2],[2,0],[3,0],[5,0],[6,0],[7,0],[8,0],[10,0],[2,5],[1,8],[0,10]]
+            good_choices = [[1, 2], [2, 0], [3, 0], [5, 0], [6, 0], [7, 0], [8, 0], [10, 0], [2, 5], [1, 8], [0, 10]]
             pos = choice(good_choices)
             if choice([0, 1]) == 1:
                 pos = [pos[1], pos[0]]
             self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
-            self.board[pos[0]][pos[1]] = self.colour
+            self.board.set_tile_colour(pos[0], pos[1], self.colour)
+            self.last_move = pos
             self.turn_count += 1
             return
         depth = 4
         best_score, pos = self.minimax(self.board, depth, True, float('-inf'), float('inf'))
-        pos = []
         self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
-        self.board[pos[0]][pos[1]] = self.colour
+        self.board.set_tile_colour(pos[0], pos[1], self.colour)
+        self.last_move = pos
         self.turn_count += 1
+
+    def make_move_copy(self, tiles, move, colour):
+        tiles_copy = [row[:] for row in tiles]
+        tiles_copy[move[0]][move[1]] = colour
+        return tiles_copy
 
     def minimax(self, board, depth, maximizing_player, alpha, beta):
         if depth == 0 or board.has_ended():
@@ -95,8 +109,10 @@ class Ouragent():
         if maximizing_player:
             max_eval = float('-inf')
             best_move = None
-            for move in self.get_possible_moves(board, self.colour):
-                board_copy = self.make_move_copy(board, move, self.colour)
+            for move in self.get_possible_moves(board.get_tiles()):
+                board_copy=Board()
+                tiles_copy= self.make_move_copy(board, move, self.colour)
+                board_copy._tiles = tiles_copy
                 eval, _ = self.minimax(board_copy, depth - 1, False, alpha, beta)
                 if eval > max_eval:
                     max_eval = eval
@@ -108,8 +124,10 @@ class Ouragent():
         else:
             min_eval = float('inf')
             best_move = None
-            for move in self.get_possible_moves(board):
-                board_copy = self.make_move_copy(board, move, self.opp_colour())
+            for move in self.get_possible_moves(board.get_tiles()):
+                board_copy=Board()
+                tiles_copy= self.make_move_copy(board, move, self.colour)
+                board_copy._tiles = tiles_copy
                 eval, _ = self.minimax(board_copy, depth - 1, True, alpha, beta)
                 if eval < min_eval:
                     min_eval = eval
@@ -136,11 +154,11 @@ class Ouragent():
         Q_values = model.predict(state.reshape((1, 6, 6, 1)))
         return np.argmax(Q_values[0])
 
-    def get_possible_moves(self, board):
+    def get_possible_moves(self, tiles):
         moves = []
         for x in range(self.board_size):
             for y in range(self.board_size):
-                if board[x][y] == 0:
+                if tiles[x][y] == 0:
                     moves.append((x, y))
         return moves
 

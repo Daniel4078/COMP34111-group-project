@@ -2,11 +2,11 @@ import socket
 import random
 # import model
 import sys
-sys.path.append("C:/Users/user/Desktop/COMP34111-group-project-master/src")
+sys.path.append("D:\Programming\COMP34111-group-project\src")
 from Board import Board
 from Colour import Colour
 import numpy as np
-
+from keras.models import load_model
 
 class Ouragent():
     HOST = "127.0.0.1"
@@ -22,6 +22,7 @@ class Ouragent():
         self.colour = ""
         self.turn_count = 0
         self.last_move = None
+        self.model = load_model('hex_agent_model.keras')
 
     def run(self):
         while True:
@@ -75,6 +76,19 @@ class Ouragent():
         if (x == 10 and y == 0) or (x == 0 and y == 10):
             return True
         return False
+
+    def tile_to_state(self, tile):
+        colour = tile.get_colour()
+        if colour == Colour.RED:
+            return 1  # Assuming RED represents Player 1
+        elif colour == Colour.BLUE:
+            return 2  # Assuming BLUE represents Player 2
+        else:
+            return 0  # Assuming None or another value represents an empty tile
+    
+    
+    def board_to_state(self, board_tiles):
+        return np.array([[self.tile_to_state(tile) for tile in row] for row in board_tiles])
 
     def make_move(self):
         # print(f"{self.colour} making move")
@@ -148,15 +162,15 @@ class Ouragent():
                 part = []
                 for i in range(6):
                     part.append(tiles[a + i][b:b + 6])
-                # state = model.board_to_state(part)
-                # Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+                state = self.board_to_state(part)
+                Q_values = self.model.predict(state.reshape((1, 6, 6, 1)))
                 score = 1
                 if score > 2:  # TODO: 优势劣势的分界线在哪？
                     condense.set_tile_colour(a, b, Colour.from_char(self.colour))
                 elif score < -2:
                     condense.set_tile_colour(a, b, Colour.from_char(self.opp_colour()))
-        # state = model.board_to_state(condense.get_tiles())
-        #Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+        state = self.board_to_state(condense.get_tiles())
+        Q_values = self.model.predict(state.reshape((1, 6, 6, 1)))
         score = 1
         return score
 

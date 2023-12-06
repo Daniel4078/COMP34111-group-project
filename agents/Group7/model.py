@@ -35,11 +35,10 @@ def board_to_state(board_tiles):
 
 
 def calculate_reward(game, agent_color):
-    if game.get_board().has_ended():
-        if game.get_board().get_winner() == agent_color:
-            return 10  # Positive reward for winning
-        else:
-            return -10  # Negative reward for losing
+    if game.get_board().get_winner() == agent_color:
+        return 10  # Positive reward for winning
+    else:
+        return -10  # Negative reward for losing
 
 
 def choose_action(state, epsilon, model):
@@ -69,17 +68,13 @@ model = models.Sequential([
     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
     layers.Flatten(),
     layers.Dense(64, activation='relu'),
-    # Output for Q-values
     layers.Dense(36, activation='linear', name='q_values'),
-    # layers.Dense(1, activation='sigmoid', name='winning_rate')  # Output for winning rate
 ])
 
 # Compile the model with loss
 model.compile(optimizer='adam',
-              #   loss={'q_values': 'mean_squared_error', 'winning_rate': 'binary_crossentropy'},
               loss={'q_values': 'mean_squared_error'},
               loss_weights={'q_values': 1.0})
-#   loss_weights={'q_values': 1.0, 'winning_rate': 0.5})
 
 # Define the second neural network architecture
 model2 = models.Sequential([
@@ -93,6 +88,17 @@ model2 = models.Sequential([
 model2.compile(optimizer='adam',
               loss={'q_values': 'mean_squared_error'},
               loss_weights={'q_values': 1.0})
+
+# Define the neural network architecture for board evaluation
+model3 = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
+    layers.Flatten(),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(1, activation='linear', name='board_eval'),
+])
+
+# Compile the model with appropriate loss and optimizer for regression
+model3.compile(optimizer='adam', loss='mean_squared_error')
 
 
 # Training parameters
@@ -186,6 +192,17 @@ for episode in range(num_episodes):
         # Train the model on the updated Q-values
         model2.train_on_batch(States2[move_num].reshape((1, 6, 6, 1)), Q_values2)
 
+    # Train the step prediction model
+    board_scores = []
+    for move_num in range(len(States)):
+        if game.get_board().get_winner() == agent_color:
+            board_scores.insert(0, 100 * (0.86**move_num))
+        else:
+            board_scores.insert(0, -100 * (0.86**move_num))
+    model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=3, batch_size=3)
+
+    # print(f"The socre is: {model3.predict(States[5])}")
+
     print(Q_values)
     print(state.reshape(6,6))
     # Decay epsilon for exploration-exploitation trade-off
@@ -203,3 +220,4 @@ print(f"Winning rate: {win/(episode+1)}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')
+model3.save('board_evaluation_model.keras')

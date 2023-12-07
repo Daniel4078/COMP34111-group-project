@@ -2,6 +2,7 @@ import random
 from keras import layers, models
 import tensorflow as tf
 import numpy as np
+import csv
 
 import sys
 sys.path.append(r"D:\Programming\COMP34111-group-project\src")
@@ -105,21 +106,11 @@ model2.compile(optimizer='adam',
               loss={'q_values': 'mean_squared_error'},
               loss_weights={'q_values': 1.0})
 
-# Define the neural network architecture for board evaluation
-model3 = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(1, activation='tanh', name='board_eval'),
-])
-
-# Compile the model with appropriate loss and optimizer for regression
-model3.compile(optimizer='adam', loss='mean_squared_error')
-
 
 # Training parameters
-num_episodes = 1000
+num_episodes = 5
 win = 0
+csv_file_path = 'board_evaluation.csv'
 
 for episode in range(num_episodes):
     # Initialization
@@ -209,7 +200,12 @@ for episode in range(num_episodes):
             board_scores.insert(0, 1 * (0.86**move_num))
         else:
             board_scores.insert(0, -1 * (0.86**move_num))
-    model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
+    # model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
+    with open(csv_file_path, 'a') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        for move_num in range(len(States)):
+            # Save the state and board score to the CSV file
+            csv_writer.writerow(list(States[move_num].reshape(-1, 6, 6, 1)) + [board_scores[move_num]])
 
     board_scores = []
     for move_num in range(len(States2)):
@@ -217,7 +213,12 @@ for episode in range(num_episodes):
             board_scores.insert(0, 1 * (0.86**move_num))
         else:
             board_scores.insert(0, -1 * (0.86**move_num))
-    model3.fit(np.array(States2).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
+    # model3.fit(np.array(States2).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
+    with open(csv_file_path, 'a') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        for move_num in range(len(States2)):
+            # Save the state and board score to the CSV file
+            csv_writer.writerow(list(States2[move_num].reshape(-1, 6, 6, 1)) + [board_scores[move_num]])
 
 
     print(Q_values)
@@ -237,4 +238,3 @@ print(f"Winning rate: {win/(episode+1)}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')
-model3.save('board_evaluation_model.keras')

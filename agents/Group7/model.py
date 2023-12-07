@@ -44,18 +44,32 @@ def calculate_reward(game, agent_color):
 def choose_action(state, epsilon, model):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
-        return np.random.randint(0, 36)
-    else:
-        # Exploit - choose the action with the highest Q-value
-        Q_values = model.predict(state.reshape((1, 6, 6, 1)))
-        return np.argmax(Q_values[0])
-
+        action =  np.random.randint(0, 36)
+        row, col = divmod(action, 6)
+        return action, row, col
+    
+    num_selection = 1
+    Q_values = model.predict(state.reshape((1, 6, 6, 1)))
+    while True:
+        if num_selection == 1:
+            # Exploit - choose the action with the highest Q-value
+            action = np.argmax(Q_values[0])
+        else:
+            # Exploit - choose the action with the next highest Q-value
+            action = np.argpartition(Q_values[0], -num_selection)[-num_selection]
+        # Check it has been occupied
+        row, col = divmod(action, 6)
+        if state.reshape(6,6)[row, col] != 0:
+            num_selection += 1
+        else:
+            return action, row, col
 
 # Function to update Q-values using Q-learning update rule
 def update_q_values(state, action, States, reward, done, model):
     target = reward
     if not done:
         next_state = States[move_num + 1]
+
         Q_values_next = model.predict(next_state.reshape((1, 6, 6, 1)))
         target += gamma * np.max(Q_values_next[0])
     Q_values = model.predict(state.reshape((1, 6, 6, 1)))
@@ -102,7 +116,7 @@ model3.compile(optimizer='adam', loss='mean_squared_error')
 
 
 # Training parameters
-num_episodes = 100
+num_episodes = 1
 win = 0
 
 for episode in range(num_episodes):
@@ -132,14 +146,11 @@ for episode in range(num_episodes):
     while True:
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
-            action = choose_action(state, epsilon, model)
-            row, col = divmod(action, 6)
-            if state.reshape(6,6)[row, col] != 0:  # Check if the cell is already occupied
-                continue  # Invalid move, skip to the next iteration
-            
+            # Choose action
+            action, row, col = choose_action(state, epsilon, model)
             # Make move
             game.get_board().set_tile_colour(row, col, agent_color)
-
+            
             # Store the state after player1 move
             state = board_to_state(game.get_board().get_tiles())
             state = state.reshape((1, 6, 6, 1))
@@ -153,12 +164,9 @@ for episode in range(num_episodes):
 
         start = False
         # Player2 
-        while True:
-            action2 = choose_action(state, epsilon, model2)
-            row, col = divmod(action2, 6)
-            if state.reshape(6,6)[row, col] == 0:
-                game.get_board().set_tile_colour(row, col, player2)
-                break
+        action2, row, col = choose_action(state, epsilon, model2)
+        # Make move
+        game.get_board().set_tile_colour(row, col, player2)
 
         # Store the state after player2 move
         state = board_to_state(game.get_board().get_tiles())
@@ -171,6 +179,8 @@ for episode in range(num_episodes):
         if game.get_board().has_ended():
             break
 
+    print(States)
+
     # Give reward
     reward = calculate_reward(game, agent_color)
     for move_num in range(len(States) - 1, -1, -1):
@@ -179,6 +189,7 @@ for episode in range(num_episodes):
             States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
         
         # Train the model on the updated Q-values
+        print(f"model1: {move_num}")
         model.train_on_batch(States[move_num].reshape((1, 6, 6, 1)), Q_values)
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
@@ -190,6 +201,7 @@ for episode in range(num_episodes):
             States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
         
         # Train the model on the updated Q-values
+        print(f"model2: {move_num}")
         model2.train_on_batch(States2[move_num].reshape((1, 6, 6, 1)), Q_values2)
 
     # Train the step prediction model
@@ -199,9 +211,7 @@ for episode in range(num_episodes):
             board_scores.insert(0, 100 * (0.86**move_num))
         else:
             board_scores.insert(0, -100 * (0.86**move_num))
-    model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=3, batch_size=3)
-
-    # print(f"The socre is: {model3.predict(States[5])}")
+    model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=3, batch_size=1)
 
     print(Q_values)
     print(state.reshape(6,6))

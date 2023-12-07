@@ -108,7 +108,7 @@ model2.compile(optimizer='adam',
 
 
 # Training parameters
-num_episodes = 5
+num_episodes = 100
 win = 0
 csv_file_path = 'board_evaluation.csv'
 
@@ -119,8 +119,12 @@ for episode in range(num_episodes):
     agent_color = random.choice([Colour.RED, Colour.BLUE])
     if agent_color == Colour.RED:
         player2 = Colour.BLUE
+        player1_num = 1
+        player2_num = 2
     else:
         player2 = Colour.RED
+        player1_num = 2
+        player2_num = 1
     
     start = True
     tiles = game.get_board().get_tiles()
@@ -131,9 +135,11 @@ for episode in range(num_episodes):
     
     # To store every board state during one game
     States = []
+    States_eval = []
     Actions = []
 
     States2 = []
+    States2_eval = []
     Actions2 = []
 
     while True:
@@ -150,6 +156,8 @@ for episode in range(num_episodes):
 
             # Add the action and state 
             States.append(state)
+            state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
+            States_eval.append(state_eval)
             Actions.append(action)
 
             if game.get_board().has_ended():
@@ -167,6 +175,8 @@ for episode in range(num_episodes):
 
         # Add the action and state 
         States2.append(state)
+        state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
+        States2_eval.append(state2_eval)
         Actions2.append(action2)
 
         if game.get_board().has_ended():
@@ -193,32 +203,32 @@ for episode in range(num_episodes):
         # Train the model on the updated Q-values
         model2.train_on_batch(States2[move_num].reshape((1, 6, 6, 1)), Q_values2)
 
-    # Train the step prediction model
+    # Store training sample for score prediction model
     board_scores = []
-    for move_num in range(len(States)):
+    for move_num in range(len(States_eval)):
         if game.get_board().get_winner() == agent_color:
             board_scores.insert(0, 1 * (0.86**move_num))
         else:
             board_scores.insert(0, -1 * (0.86**move_num))
-    # model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
-    with open(csv_file_path, 'a') as csv_file:
+
+    with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-        for move_num in range(len(States)):
+        for move_num in range(len(States_eval)):
             # Save the state and board score to the CSV file
-            csv_writer.writerow(list(States[move_num].reshape(-1, 6, 6, 1)) + [board_scores[move_num]])
+            csv_writer.writerow(list(States_eval[move_num]) + [board_scores[move_num]])
 
     board_scores = []
-    for move_num in range(len(States2)):
+    for move_num in range(len(States2_eval)):
         if game.get_board().get_winner() != agent_color:
             board_scores.insert(0, 1 * (0.86**move_num))
         else:
             board_scores.insert(0, -1 * (0.86**move_num))
-    # model3.fit(np.array(States2).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
-    with open(csv_file_path, 'a') as csv_file:
+
+    with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-        for move_num in range(len(States2)):
+        for move_num in range(len(States2_eval)):
             # Save the state and board score to the CSV file
-            csv_writer.writerow(list(States2[move_num].reshape(-1, 6, 6, 1)) + [board_scores[move_num]])
+            csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
 
 
     print(Q_values)

@@ -10,15 +10,17 @@ def preprocess_input(input_array):
     flat_list = [int(num) for num in re.findall(r'\b\d+\b', str(input_array))]
     
     # Convert the list to a NumPy array with the desired shape
-    array_2d = np.array(flat_list).reshape(6, 6, 1)
+    array_2d = np.array(flat_list).reshape(2, 6, 6, 1)
     
     return array_2d
 
 # Define the neural network architecture for board evaluation
 model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(2, 6, 6, 1)),
     layers.Flatten(),
-    layers.Dense(64, activation='relu'),
+    layers.Dense(128, activation='relu'),  # Additional hidden layer
+    layers.Dense(64, activation='relu'),   # Additional hidden layer
+    layers.Dense(32, activation='relu'),   # Additional hidden layer
     layers.Dense(1, activation='tanh', name='board_eval'),
 ])
 
@@ -26,8 +28,8 @@ model = models.Sequential([
 model.compile(optimizer='adam', loss='mean_squared_error')
 
 df = pd.read_csv("board_evaluation.csv")
-X = df.iloc[:, [0]].values
-y = df.iloc[:, 1].values
+X = df.iloc[:, :2].values
+y = df.iloc[:, 2].values
 
 # Split X and y to training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -35,7 +37,7 @@ X_train = np.array([preprocess_input(x) for x in X_train])
 X_test = np.array([preprocess_input(x) for x in X_test])
 
 # Training
-history = model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test), batch_size=32)
+history = model.fit(X_train, y_train, epochs=30, validation_data=(X_test, y_test), batch_size=32)
 
 # Visualize the training loss over epochs
 plt.plot(history.history['loss'], label='Training Loss')

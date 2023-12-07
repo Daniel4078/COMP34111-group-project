@@ -44,10 +44,12 @@ def calculate_reward(game, agent_color):
 def choose_action(state, epsilon, model):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
-        action =  np.random.randint(0, 36)
-        row, col = divmod(action, 6)
-        return action, row, col
-    
+        while True:
+            action =  np.random.randint(0, 36)
+            row, col = divmod(action, 6)
+            if state.reshape(6,6)[row, col] == 0:
+                return action, row, col
+
     num_selection = 1
     Q_values = model.predict(state.reshape((1, 6, 6, 1)))
     while True:
@@ -108,7 +110,7 @@ model3 = models.Sequential([
     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
     layers.Flatten(),
     layers.Dense(64, activation='relu'),
-    layers.Dense(1, activation='linear', name='board_eval'),
+    layers.Dense(1, activation='tanh', name='board_eval'),
 ])
 
 # Compile the model with appropriate loss and optimizer for regression
@@ -116,7 +118,7 @@ model3.compile(optimizer='adam', loss='mean_squared_error')
 
 
 # Training parameters
-num_episodes = 1
+num_episodes = 1000
 win = 0
 
 for episode in range(num_episodes):
@@ -179,8 +181,6 @@ for episode in range(num_episodes):
         if game.get_board().has_ended():
             break
 
-    print(States)
-
     # Give reward
     reward = calculate_reward(game, agent_color)
     for move_num in range(len(States) - 1, -1, -1):
@@ -189,7 +189,6 @@ for episode in range(num_episodes):
             States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
         
         # Train the model on the updated Q-values
-        print(f"model1: {move_num}")
         model.train_on_batch(States[move_num].reshape((1, 6, 6, 1)), Q_values)
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
@@ -201,17 +200,25 @@ for episode in range(num_episodes):
             States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
         
         # Train the model on the updated Q-values
-        print(f"model2: {move_num}")
         model2.train_on_batch(States2[move_num].reshape((1, 6, 6, 1)), Q_values2)
 
     # Train the step prediction model
     board_scores = []
     for move_num in range(len(States)):
         if game.get_board().get_winner() == agent_color:
-            board_scores.insert(0, 100 * (0.86**move_num))
+            board_scores.insert(0, 1 * (0.86**move_num))
         else:
-            board_scores.insert(0, -100 * (0.86**move_num))
-    model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=3, batch_size=1)
+            board_scores.insert(0, -1 * (0.86**move_num))
+    model3.fit(np.array(States).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
+
+    board_scores = []
+    for move_num in range(len(States2)):
+        if game.get_board().get_winner() != agent_color:
+            board_scores.insert(0, 1 * (0.86**move_num))
+        else:
+            board_scores.insert(0, -1 * (0.86**move_num))
+    model3.fit(np.array(States2).reshape(-1, 6, 6, 1), np.array(board_scores), epochs=5)
+
 
     print(Q_values)
     print(state.reshape(6,6))

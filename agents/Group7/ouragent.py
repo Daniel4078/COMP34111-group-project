@@ -1,6 +1,5 @@
 import socket
 import random
-# import model
 import sys
 sys.path.append("D:\Programming\COMP34111-group-project\src")
 from Board import Board
@@ -124,7 +123,7 @@ class Ouragent():
 
     def minimax(self, board, depth, maximizing_player, alpha, beta):
         if depth == 0 or board.has_ended():
-            return self.evaluate_board(board.get_tiles()), None
+            return self.evaluate_board(board.get_tiles(),maximizing_player), None
 
         if maximizing_player:
             max_eval = float('-inf')
@@ -155,7 +154,7 @@ class Ouragent():
             print(best_move)
             return min_eval, best_move
 
-    def evaluate_board(self, tiles):  # TODO: adoptation to different board sizes
+    def evaluate_board(self, tiles, maximizing_player):  # TODO: adoptation to different board sizes
         condense = Board(board_size=6)
         for a in range(6):
             for b in range(6):
@@ -163,15 +162,15 @@ class Ouragent():
                 for i in range(6):
                     part.append(tiles[a + i][b:b + 6])
                 state = self.board_to_state(part)
-                Q_values = self.model.predict(state.reshape((1, 6, 6, 1)))
-                score = 1
-                if score > 2:  # TODO: 优势劣势的分界线在哪？
+                score = self.model.predict(state.reshape((1, 6, 6, 1)))
+                if score > 0.2:  # TODO: 优势劣势的分界线在哪？
                     condense.set_tile_colour(a, b, Colour.from_char(self.colour))
-                elif score < -2:
+                elif score < -0.2:
                     condense.set_tile_colour(a, b, Colour.from_char(self.opp_colour()))
         state = self.board_to_state(condense.get_tiles())
-        Q_values = self.model.predict(state.reshape((1, 6, 6, 1)))
-        score = 1
+        score = self.model.predict(state.reshape((1, 6, 6, 1)))
+        if maximizing_player:
+            score = -score
         return score
 
     def get_possible_moves(self, tiles):

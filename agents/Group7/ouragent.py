@@ -20,10 +20,11 @@ class Ouragent():
         self.board_size = board_size
         self.board = Board(self.board_size)
         self.colour = ""
+        self.player_num = 0
         self.turn_count = 0
         self.last_move = None
         self.eva_model =  keras.models.load_model('agents/Group7/board_evaluation_model.keras')
-        self.step_model =
+        self.step_model = keras.models.load_model('agents/Group7/hex_agent_model.keras')
 
     def run(self):
         while True:
@@ -38,14 +39,19 @@ class Ouragent():
     def interpret_data(self, data):
         messages = data.decode("utf-8").strip().split("\n")
         messages = [x.split(";") for x in messages]
-        # print(messages)
+        print(messages)
         for s in messages:
             if s[0] == "START":
                 self.board_size = int(s[1])
                 self.colour = s[2]
                 self.board = Board(self.board_size)
+                
                 if self.colour == "R":
+                    self.player_num = 1 
                     self.make_move()
+                else:
+                    self.player_num = 2
+                    
             elif s[0] == "END":
                 return True
             elif s[0] == "CHANGE":
@@ -53,6 +59,7 @@ class Ouragent():
                     return True
                 elif s[1] == "SWAP":
                     self.colour = self.opp_colour()
+                    self.player_num = 2
                     if s[3] == self.colour:
                         self.make_move()
                 elif s[3] == self.colour:
@@ -167,36 +174,43 @@ class Ouragent():
                 part = []
                 for i in range(6):
                     part.append(tiles[a + i][b:b + 6])
-                state = self.board_to_state(part)
-                print('start predict')
-                score = self.eva_model.predict(state.reshape((1, 6, 6, 1)))
-                print('end predict')
+                state = self.board_to_state(part).reshape(1, 6, 6, 1)
+                state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
+                score = self.eva_model.predict(state_eval.reshape(1, 2, 6, 6, 1), verbose=0)
+                # print('end predict')
                 if score > 0.2:  # TODO: 优势劣势的分界线在哪？
                     condense.set_tile_colour(a, b, Colour.from_char(self.colour))
                 elif score < -0.2:
                     condense.set_tile_colour(a, b, Colour.from_char(self.opp_colour()))
-                print(str(a)+" "+str(b))
-        print('done small board')
-        state = self.board_to_state(condense.get_tiles())
-        score = self.eva_model.predict(state.reshape((1, 6, 6, 1)))
+                # print(str(a)+" "+str(b))
+        # print('done small board')
+        state = self.board_to_state(condense.get_tiles()).reshape(1, 6, 6, 1)
+        state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
+        score = self.eva_model.predict(state_eval.reshape(1, 2, 6, 6, 1), verbose=0)
         if maximizing_player:
             score = -score
         return score
 
     def get_good_moves(self, tiles):
         state = self.board_to_state(tiles)
-        Q_values = self.step_model.predict(state.reshape((1,11,11,1)))
-        indexes = np.argsort(Q_values)
+        Q_values = self.step_model.predict(state.reshape((1,11,11,1)), verbose=0)
+        # indexes = np.argsort(Q_values)
         moves = []
-        x = 0
+        i = 0
+        index = 1
         while i <= 3:
-            position = indexes[x]
-            x = position//11
-            y = position-x*11
+            if index == 1:
+                position = np.argmax(Q_values[0])
+            else:
+                position = np.argpartition(Q_values[0], -index)[-index]
+
+            x, y = divmod(position, 11)
             if tiles[x][y].get_colour() is None:
                 moves.append((x, y))
                 i += 1
-            x += 1
+                index += 1
+            else:
+                index += 1
         return moves
 
     def opp_colour(self):

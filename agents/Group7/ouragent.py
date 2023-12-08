@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+import time
 sys.path.append(r"C:/Users/ttt/Desktop/COMP34111-group-project/src")
 from Board import Board
 from Colour import Colour
@@ -24,7 +25,7 @@ class Ouragent():
         self.turn_count = 0
         self.last_move = None
         self.eva_model =  keras.models.load_model('agents/Group7/board_evaluation_model.keras')
-        self.step_model = keras.models.load_model('agents/Group7/hex_agent_model.keras')
+        self.step_model = keras.models.load_model('agents/Group7/hex_agent_model_pooling.keras')
 
     def run(self):
         while True:
@@ -39,7 +40,7 @@ class Ouragent():
     def interpret_data(self, data):
         messages = data.decode("utf-8").strip().split("\n")
         messages = [x.split(";") for x in messages]
-        print(messages)
+        # print(messages)
         for s in messages:
             if s[0] == "START":
                 self.board_size = int(s[1])
@@ -66,7 +67,7 @@ class Ouragent():
                     action = [int(x) for x in s[1].split(",")]
                     print(action)
                     self.board.set_tile_colour(action[0], action[1], Colour.from_char(self.opp_colour()))
-                    print("current")
+                    # print("current")
                     print(self.board.print_board())
                     self.last_move = action
                     self.make_move()
@@ -119,7 +120,7 @@ class Ouragent():
             self.turn_count += 1
             return
         print("start minimax")
-        best_score, pos = self.minimax(self.board, 4, True, float('-inf'), float('inf'))
+        best_score, pos = self.minimax(self.board, 2, True, float('-inf'), float('inf'))
         self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
         self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
         print(self.board.print_board())
@@ -195,10 +196,11 @@ class Ouragent():
         state = self.board_to_state(tiles)
         Q_values = self.step_model.predict(state.reshape((1,11,11,1)), verbose=0)
         indexes = np.argsort(Q_values[0])[::-1]
+        print(indexes)
         moves = []
         i = 0
-        index = 1
-        while i <= 3:
+        index = 0
+        while i < 2:
             position = indexes[index]
             x, y = divmod(position, 11)
             if tiles[x][y].get_colour() is None:

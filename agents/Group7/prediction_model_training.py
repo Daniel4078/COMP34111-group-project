@@ -15,12 +15,27 @@ def preprocess_input(input_array):
     return array_2d
 
 # Define the neural network architecture for board evaluation
+# model = models.Sequential([
+#     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(2, 6, 6, 1)),
+#     layers.BatchNormalization(),
+#     layers.Flatten(),
+#     layers.Dense(128, activation='relu'),
+#     layers.Dropout(0.5),
+#     layers.Dense(64, activation='relu'),
+#     layers.Dropout(0.5),
+#     layers.Dense(32, activation='relu'),
+#     layers.Dropout(0.5),
+#     layers.Dense(1, activation='tanh', name='board_eval'),
+# ])
+
 model = models.Sequential([
     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(2, 6, 6, 1)),
+    layers.BatchNormalization(),
     layers.Flatten(),
-    layers.Dense(128, activation='relu'),  # Additional hidden layer
-    layers.Dense(64, activation='relu'),   # Additional hidden layer
-    layers.Dense(32, activation='relu'),   # Additional hidden layer
+    layers.Dense(128, activation='relu'),  
+    layers.Dropout(0.5),
+    layers.Dense(64, activation='relu'),  
+    layers.Dense(32, activation='relu'),   
     layers.Dense(1, activation='tanh', name='board_eval'),
 ])
 
@@ -37,7 +52,7 @@ X_train = np.array([preprocess_input(x) for x in X_train])
 X_test = np.array([preprocess_input(x) for x in X_test])
 
 # Training
-history = model.fit(X_train, y_train, epochs=30, validation_data=(X_test, y_test), batch_size=32)
+history = model.fit(X_train, y_train, epochs=50, validation_data=(X_test, y_test), batch_size=32)
 
 # Visualize the training loss over epochs
 plt.plot(history.history['loss'], label='Training Loss')

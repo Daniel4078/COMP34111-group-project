@@ -79,14 +79,39 @@ def update_q_values(state, action, States, reward, done, model):
     Q_values[0, action] = target
     return Q_values
 
+def create_model(input_shape=(6, 6, 1)):
+    model = models.Sequential()
+
+    # First Convolutional Block
+    model.add(layers.Conv2D(64, (3, 3), activation='relu', padding='same', input_shape=input_shape))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(64, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPooling2D((2, 2)))
+
+    # Second Convolutional Block
+    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPooling2D((2, 2)))
+
+    # Third Convolutional Block
+    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+
+    # Flatten and Dense layers
+    model.add(layers.Flatten())
+    model.add(layers.Dense(256, activation='relu'))
+    model.add(layers.Dropout(0.5))
+    model.add(layers.Dense(36, activation='linear', name='q_values')) # output layer
+
+    return model
 
 # Define the neural network architecture
-model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(36, activation='linear', name='q_values'),
-])
+model = create_model()
 
 # Compile the model with loss
 model.compile(optimizer='adam',
@@ -94,12 +119,7 @@ model.compile(optimizer='adam',
               loss_weights={'q_values': 1.0})
 
 # Define the second neural network architecture
-model2 = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(6, 6, 1)),
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(36, activation='linear', name='q_values'),
-])
+model2 = create_model()
 
 # Compile the model with loss
 model2.compile(optimizer='adam',

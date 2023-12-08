@@ -1,19 +1,18 @@
 import random
-from keras import layers, models
 import keras
-import tensorflow as tf
 import numpy as np
 import csv
+import time
 
 import sys
-sys.path.append(r"C:\Users\ttt\Desktop\COMP34111-group-project\src")
+sys.path.append(r"D:\Programming\COMP34111-group-project\src")
 
 from Game import Game
 from Colour import Colour
 
 # Load model
-model = keras.models.load_model(r"C:\Users\ttt\Desktop\COMP34111-group-project\agents\Group7\hex_agent_model2.keras")
-model2 = keras.models.load_model(r"C:\Users\ttt\Desktop\COMP34111-group-project\agents\Group7\hex_agent_model2.keras")
+model = keras.models.load_model("D:\Programming\COMP34111-group-project\hex_agent_model.keras")
+model2 = keras.models.load_model("D:\Programming\COMP34111-group-project\hex_agent_model.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
@@ -56,14 +55,13 @@ def choose_action(state, epsilon, model):
                 return action, row, col
 
     num_selection = 1
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
+    state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
+    Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)))
+    indexes = np.argsort(Q_values[0])[::-1]
     while True:
-        if num_selection == 1:
-            # Exploit - choose the action with the highest Q-value
-            action = np.argmax(Q_values[0])
-        else:
-            # Exploit - choose the action with the next highest Q-value
-            action = np.argpartition(Q_values[0], -num_selection)[-num_selection]
+        # Exploit - choose the action with the highest Q-value
+        action = indexes[num_selection]
+
         # Check it has been occupied
         row, col = divmod(action, 11)
         if state.reshape(11, 11)[row, col] != 0:
@@ -77,15 +75,16 @@ def update_q_values(state, action, States, reward, done, model):
     if not done:
         next_state = States[move_num + 1]
 
-        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)))
+        Q_values_next = model.predict(next_state.reshape((1, 2, 11, 11, 1)))
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
     Q_values[0, action] = target
     return Q_values
 
 # Training parameters
-num_episodes = 100
+num_episodes = 10
 win = 0
+total_training_time = 0
 csv_file_path = 'board_evaluation.csv'
 
 for episode in range(num_episodes):
@@ -95,8 +94,12 @@ for episode in range(num_episodes):
     agent_color = random.choice([Colour.RED, Colour.BLUE])
     if agent_color == Colour.RED:
         player2 = Colour.BLUE
+        player1_num = 1
+        player2_num = 2
     else:
         player2 = Colour.RED
+        player1_num = 2
+        player2_num = 1
     
     start = True
     tiles = game.get_board().get_tiles()
@@ -107,25 +110,35 @@ for episode in range(num_episodes):
     
     # To store every board state during one game
     States = []
+    States_eval = []
     Actions = []
 
     States2 = []
+    States2_eval = []
     Actions2 = []
+
+    # Set timeer
+    startTime = time.time()
 
     while True:
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
+            # Add the state before move
+            state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
+            States.append(state_player)
+
             # Choose action
             action, row, col = choose_action(state, epsilon, model)
+
             # Make move
             game.get_board().set_tile_colour(row, col, agent_color)
             
-            # Store the state after player1 move
+            # Store the state_eval and action after player1 move
             state = board_to_state(game.get_board().get_tiles())
             state = state.reshape((1, 11, 11, 1))
 
-            # Add the action and state 
-            States.append(state)
+            state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
+            States_eval.append(state_eval)
             Actions.append(action)
 
             if game.get_board().has_ended():
@@ -133,21 +146,28 @@ for episode in range(num_episodes):
 
         start = False
         # Player2 
+        # Add the state before move
+        state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
+        States2.append(state_player)
+
+        # Choose action
         action2, row, col = choose_action(state, epsilon, model2)
         # Make move
         game.get_board().set_tile_colour(row, col, player2)
 
-        # Store the state after player2 move
+        # Store the state_eval and action after player2 move
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 11, 11, 1))
 
-        # Add the action and state 
-        States2.append(state)
+        state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
+        States2_eval.append(state2_eval)
         Actions2.append(action2)
 
         if game.get_board().has_ended():
             break
+    run_time = time.time() - startTime    
 
+    startTime = time.time()
     # Give reward
     reward = calculate_reward(game, agent_color)
     for move_num in range(len(States) - 1, -1, -1):
@@ -156,7 +176,7 @@ for episode in range(num_episodes):
             States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
         
         # Train the model on the updated Q-values
-        model.train_on_batch(States[move_num].reshape((1, 11, 11, 1)), Q_values)
+        model.train_on_batch(States[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
 
@@ -167,7 +187,38 @@ for episode in range(num_episodes):
             States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
         
         # Train the model on the updated Q-values
-        model2.train_on_batch(States2[move_num].reshape((1, 11, 11, 1)), Q_values2)
+        model2.train_on_batch(States2[move_num].reshape((1, 2, 11, 11, 1)), Q_values2)
+
+    training_time = time.time() - startTime
+    total_training_time += training_time
+
+    # Prepare samples for evaluation model 
+    board_scores = []
+    for move_num in range(len(States_eval)):
+        if game.get_board().get_winner() == agent_color:
+            board_scores.insert(0, 1 * (0.86**move_num))
+        else:
+            board_scores.insert(0, -1 * (0.86**move_num))
+
+    with open(csv_file_path, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        for move_num in range(len(States_eval)):
+            # Save the state and board score to the CSV file
+            csv_writer.writerow(list(States_eval[move_num]) + [board_scores[move_num]])
+
+    board_scores = []
+    for move_num in range(len(States2_eval)):
+        if game.get_board().get_winner() != agent_color:
+            board_scores.insert(0, 1 * (0.86**move_num))
+        else:
+            board_scores.insert(0, -1 * (0.86**move_num))
+
+    with open(csv_file_path, 'a', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        for move_num in range(len(States2_eval)):
+            # Save the state and board score to the CSV file
+            csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
+
 
     print(Q_values)
     print(state.reshape(11, 11))
@@ -180,10 +231,13 @@ for episode in range(num_episodes):
         win += 1
     
     print(f"Episode: {episode + 1}, Total Reward: {total_reward}, Agent Colour: {agent_color}")
+    print(f"Runing time: {run_time}, Training time: {training_time}")
     print(f"Winner: {game.get_board().get_winner()}")
 
+print("")
 print(f"Winning rate: {win/(episode+1)}")
+print(f"Total training time: {total_training_time}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')
-model.save('hex_agent_model2.keras')
+model2.save('hex_agent_model2.keras')

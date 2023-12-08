@@ -80,27 +80,61 @@ def update_q_values(state, action, States, reward, done, model):
     return Q_values
 
 
-# Define the neural network architecture
-model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(11, 11, 1)),
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(121, activation='linear', name='q_values'),
-])
+def create_model(input_shape=(11, 11, 1)):
+    model = models.Sequential()
+
+    # First Convolutional Block
+    model.add(layers.Conv2D(64, (3, 3), activation='relu', padding='same', input_shape=input_shape))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(64, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPooling2D((2, 2)))
+
+    # Second Convolutional Block
+    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.MaxPooling2D((2, 2)))
+
+    # Third Convolutional Block
+    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization())
+
+    # Flatten and Dense layers
+    model.add(layers.Flatten())
+    model.add(layers.Dense(256, activation='relu'))
+    model.add(layers.Dropout(0.5))
+    model.add(layers.Dense(121, activation='linear', name='q_values')) # output layer
+
+    return model
+
+
+# # Define the neural network architecture
+# model = models.Sequential([
+#     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(11, 11, 1)),
+#     layers.Flatten(),
+#     layers.Dense(64, activation='relu'),
+#     layers.Dense(121, activation='linear', name='q_values'),
+# ])
 
 # Compile the model with loss
+model = create_model()
 model.compile(optimizer='adam',
               loss={'q_values': 'mean_squared_error'},
               loss_weights={'q_values': 1.0})
 
-# Define the second neural network architecture
-model2 = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(11, 11, 1)),
-    layers.Flatten(),
-    layers.Dense(64, activation='relu'),
-    layers.Dense(121, activation='linear', name='q_values'),
-])
+# # Define the second neural network architecture
+# model2 = models.Sequential([
+#     layers.Conv2D(32, (3, 3), activation='relu', input_shape=(11, 11, 1)),
+#     layers.Flatten(),
+#     layers.Dense(64, activation='relu'),
+#     layers.Dense(121, activation='linear', name='q_values'),
+# ])
 
+model2 = create_model()
 # Compile the model with loss
 model2.compile(optimizer='adam',
               loss={'q_values': 'mean_squared_error'},

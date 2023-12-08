@@ -194,23 +194,17 @@ class Ouragent():
     def get_good_moves(self, tiles):
         state = self.board_to_state(tiles)
         Q_values = self.step_model.predict(state.reshape((1,11,11,1)), verbose=0)
-        # indexes = np.argsort(Q_values)
+        indexes = np.argsort(Q_values[0])[::-1]
         moves = []
         i = 0
         index = 1
         while i <= 3:
-            if index == 1:
-                position = np.argmax(Q_values[0])
-            else:
-                position = np.argpartition(Q_values[0], -index)[-index]
-
+            position = indexes[index]
             x, y = divmod(position, 11)
             if tiles[x][y].get_colour() is None:
                 moves.append((x, y))
                 i += 1
-                index += 1
-            else:
-                index += 1
+            index += 1
         return moves
 
     def opp_colour(self):

@@ -24,8 +24,8 @@ class Ouragent():
         self.player_num = 0
         self.turn_count = 0
         self.last_move = None
-        self.eva_model =  keras.models.load_model('agents/Group7/board_evaluation_model.keras')
-        self.step_model = keras.models.load_model('agents/Group7/hex_agent_model_pooling.keras')
+        self.eva_model =  keras.models.load_model('board_evaluation_model.keras')
+        self.step_model = keras.models.load_model('hex_agent_model.keras')
 
     def run(self):
         while True:
@@ -100,7 +100,7 @@ class Ouragent():
         return np.array([[self.tile_to_state(tile) for tile in row] for row in board_tiles])
 
     def make_move(self):
-        print('make move')
+        # print('make move')
         # print(f"{self.colour} making move")
         if self.colour == "B" and self.turn_count == 0:
             if self.swap_map():  # use existing research results to decide swap or not
@@ -119,8 +119,8 @@ class Ouragent():
             self.last_move = pos
             self.turn_count += 1
             return
-        print("start minimax")
-        best_score, pos = self.minimax(self.board, 2, True, float('-inf'), float('inf'))
+        # print("start minimax")
+        best_score, pos = self.minimax(self.board, 4, True, float('-inf'), float('inf'))
         self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
         self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
         print(self.board.print_board())
@@ -129,14 +129,14 @@ class Ouragent():
 
     def make_move_copy(self, board, move, colour):
         temp = board.print_board()
-        board_copy=Board.from_string(temp)
+        board_copy = Board.from_string(temp)
         board_copy.set_tile_colour(move[0], move[1], Colour.from_char(colour))
         return board_copy
 
     def minimax(self, board, depth, maximizing_player, alpha, beta):
         if depth == 0 or board.has_ended():
-            print('evaluate')
-            return self.evaluate_board(board.get_tiles(),maximizing_player), None
+            # print('evaluate')
+            return self.evaluate_board(board.get_tiles(), maximizing_player), None
 
         if maximizing_player:
             max_eval = float('-inf')
@@ -150,7 +150,7 @@ class Ouragent():
                 alpha = max(alpha, eval)
                 if beta <= alpha:
                     break
-            print(best_move)
+            # print(best_move)
             return max_eval, best_move
         else:
             min_eval = float('inf')
@@ -164,43 +164,61 @@ class Ouragent():
                 beta = min(beta, eval)
                 if beta <= alpha:
                     break
-            print(best_move)
+            # print(best_move)
             return min_eval, best_move
 
-    def evaluate_board(self, tiles, maximizing_player):  # TODO: adoptation to different board sizes
-        print('start evaluate')
-        condense = Board(board_size=6)
-        for a in range(6):
-            for b in range(6):
-                part = []
-                for i in range(6):
-                    part.append(tiles[a + i][b:b + 6])
-                state = self.board_to_state(part).reshape(1, 6, 6, 1)
-                state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
-                score = self.eva_model.predict(state_eval.reshape(1, 2, 6, 6, 1), verbose=0)
-                # print('end predict')
-                if score > 0.2:  # TODO: 优势劣势的分界线在哪？
-                    condense.set_tile_colour(a, b, Colour.from_char(self.colour))
-                elif score < -0.2:
-                    condense.set_tile_colour(a, b, Colour.from_char(self.opp_colour()))
-                # print(str(a)+" "+str(b))
-        # print('done small board')
-        state = self.board_to_state(condense.get_tiles()).reshape(1, 6, 6, 1)
+    # def evaluate_board(self, tiles, maximizing_player):  # TODO: adoptation to different board sizes
+    #     print('start evaluate')
+    #     condense = Board(board_size=6)
+    #     for a in range(6):
+    #         for b in range(6):
+    #             part = []
+    #             for i in range(6):
+    #                 part.append(tiles[a + i][b:b + 6])
+    #             state = self.board_to_state(part).reshape(1, 6, 6, 1)
+    #             state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
+    #             score = self.eva_model.predict(state_eval.reshape(1, 2, 6, 6, 1), verbose=0)
+    #             # print('end predict')
+    #             if score > 0.2:  # TODO: 优势劣势的分界线在哪？
+    #                 condense.set_tile_colour(a, b, Colour.from_char(self.colour))
+    #             elif score < -0.2:
+    #                 condense.set_tile_colour(a, b, Colour.from_char(self.opp_colour()))
+    #             # print(str(a)+" "+str(b))
+    #     # print('done small board')
+    #     state = self.board_to_state(condense.get_tiles()).reshape(1, 6, 6, 1)
+    #     state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
+    #     score = self.eva_model.predict(state_eval.reshape(1, 2, 6, 6, 1), verbose=0)
+    #     if maximizing_player:
+    #         score = -score
+    #     return score
+    
+    def evaluate_board(self, tiles, maximizing_player):
+        # Convert the entire board to the model's expected input format
+        state = self.board_to_state(tiles).reshape(1, 11, 11, 1)
+        
+        # print(state.reshape(11,11))
+
+        # Include player information if necessary
         state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
-        score = self.eva_model.predict(state_eval.reshape(1, 2, 6, 6, 1), verbose=0)
+
+        # Use the model to predict the score of the current board state
+        score = self.eva_model.predict(state_eval.reshape(1, 2, 11, 11, 1), verbose=0)
+        
         if maximizing_player:
             score = -score
+
         return score
 
     def get_good_moves(self, tiles):
-        state = self.board_to_state(tiles)
-        Q_values = self.step_model.predict(state.reshape((1,11,11,1)), verbose=0)
+        state = self.board_to_state(tiles).reshape(1, 11, 11, 1)
+        state_step = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
+        Q_values = self.step_model.predict(state_step.reshape((1, 2, 11, 11, 1)), verbose=0)
         indexes = np.argsort(Q_values[0])[::-1]
-        print(indexes)
+        # print(indexes)
         moves = []
         i = 0
         index = 0
-        while i < 2:
+        while i < 4:
             position = indexes[index]
             x, y = divmod(position, 11)
             if tiles[x][y].get_colour() is None:

@@ -214,7 +214,6 @@ class Ouragent():
         Q_values = self.step_model.predict(state_step.reshape((1, 2, 11, 11, 1)), verbose=0)
         indexes = np.argsort(Q_values[0])[::-1]
 
-
         moves = []
         i = 0
         index = 0

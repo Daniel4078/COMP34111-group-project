@@ -133,7 +133,6 @@ model.compile(optimizer='adam',
               loss_weights={'q_values': 1.0})
 
 
-
 # Training parameters
 num_episodes = 10
 win = 0

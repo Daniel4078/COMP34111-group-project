@@ -323,7 +323,6 @@ class MockAgent():
             return False
             
 
-
 if (__name__ == "__main__"):
     agent = MockAgent()
     agent.run()

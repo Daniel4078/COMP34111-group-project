@@ -241,7 +241,6 @@ class EnemyAgent():
             return False
             
 
-
 if (__name__ == "__main__"):
     agent = EnemyAgent()
     agent.run()

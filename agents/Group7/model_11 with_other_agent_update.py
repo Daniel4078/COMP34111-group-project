@@ -105,7 +105,6 @@ def update_q_values_illegal(state, action, reward, model):
     Q_values[0, action] = reward
     return Q_values
 
-
 # Training parameters
 num_episodes = 50
 win = 0
@@ -189,9 +188,6 @@ for episode in range(num_episodes):
         state = state.reshape((1, 11, 11, 1))
         print(state.reshape(11, 11))
         
-        
-        
-
         if game.get_board().has_ended():
             break
 

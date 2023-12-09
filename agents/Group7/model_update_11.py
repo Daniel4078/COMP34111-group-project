@@ -45,7 +45,7 @@ def calculate_reward(game, agent_color):
         return -10  # Negative reward for losing
 
 
-def choose_action(state, epsilon, model):
+def choose_action(state, epsilon, model, player_num, state_player):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
         while True:
@@ -55,7 +55,6 @@ def choose_action(state, epsilon, model):
                 return action, row, col
 
     num_selection = 1
-    state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
     Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)))
     indexes = np.argsort(Q_values[0])[::-1]
     while True:
@@ -65,6 +64,13 @@ def choose_action(state, epsilon, model):
         # Check it has been occupied
         row, col = divmod(action, 11)
         if state.reshape(11, 11)[row, col] != 0:
+            # Store the illegal moves
+            if player_num == 1:
+                illegal_states.append(state_player)
+                illegal_moves.append(action)
+            else:
+                illegal_states2.append(state_player)
+                illegal_moves2.append(action)
             num_selection += 1
         else:
             return action, row, col
@@ -81,8 +87,13 @@ def update_q_values(state, action, States, reward, done, model):
     Q_values[0, action] = target
     return Q_values
 
+def update_q_values_illegal(state, action, reward, model):
+    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values[0, action] = reward
+    return Q_values
+
 # Training parameters
-num_episodes = 10
+num_episodes = 50
 win = 0
 total_training_time = 0
 csv_file_path = 'board_evaluation.csv'
@@ -113,9 +124,15 @@ for episode in range(num_episodes):
     States_eval = []
     Actions = []
 
+    illegal_states = []
+    illegal_moves = []
+
     States2 = []
     States2_eval = []
     Actions2 = []
+
+    illegal_states2 = []
+    illegal_moves2 = []
 
     # Set timeer
     startTime = time.time()
@@ -128,7 +145,7 @@ for episode in range(num_episodes):
             States.append(state_player)
 
             # Choose action
-            action, row, col = choose_action(state, epsilon, model)
+            action, row, col = choose_action(state, epsilon, model, player1_num, state_player)
 
             # Make move
             game.get_board().set_tile_colour(row, col, agent_color)
@@ -151,7 +168,7 @@ for episode in range(num_episodes):
         States2.append(state_player)
 
         # Choose action
-        action2, row, col = choose_action(state, epsilon, model2)
+        action2, row, col = choose_action(state, epsilon, model2, player2_num, state_player)
         # Make move
         game.get_board().set_tile_colour(row, col, player2)
 
@@ -170,6 +187,7 @@ for episode in range(num_episodes):
     startTime = time.time()
     # Give reward
     reward = calculate_reward(game, agent_color)
+    # Train the first model
     for move_num in range(len(States) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
@@ -180,6 +198,17 @@ for episode in range(num_episodes):
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
 
+    # Penalty for illegal moves
+    for move_num in range(len(illegal_states)):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values_illegal(
+            illegal_states[move_num], illegal_moves[move_num], -1, model)
+        
+        # Train the model on the updated Q-values
+        model.train_on_batch(illegal_states[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+
+        total_reward += -1
+
     # Train the second model
     for move_num in range(len(States2) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
@@ -188,6 +217,15 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model2.train_on_batch(States2[move_num].reshape((1, 2, 11, 11, 1)), Q_values2)
+
+    # Penalty for illegal moves
+    for move_num in range(len(illegal_states2)):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values_illegal(
+            illegal_states2[move_num], illegal_moves2[move_num], -1, model2)
+        
+        # Train the model on the updated Q-values
+        model2.train_on_batch(illegal_states2[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
 
     training_time = time.time() - startTime
     total_training_time += training_time
@@ -222,6 +260,7 @@ for episode in range(num_episodes):
 
     print(Q_values)
     print(state.reshape(11, 11))
+    print(illegal_moves)
     # Decay epsilon for exploration-exploitation trade-off
     epsilon *= epsilon_decay
     epsilon = max(min_epsilon, epsilon)

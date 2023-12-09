@@ -2,7 +2,6 @@ import socket
 import random
 import sys
 import numpy as np
-import tensorflow as tf
 from tensorflow import keras
 import time
 sys.path.append(r"C:/Users/ttt/Desktop/COMP34111-group-project/src")
@@ -214,7 +213,8 @@ class Ouragent():
         state_step = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
         Q_values = self.step_model.predict(state_step.reshape((1, 2, 11, 11, 1)), verbose=0)
         indexes = np.argsort(Q_values[0])[::-1]
-        # print(indexes)
+
+
         moves = []
         i = 0
         index = 0
@@ -225,6 +225,7 @@ class Ouragent():
                 moves.append((x, y))
                 i += 1
             index += 1
+        print(moves)
         return moves
 
     def opp_colour(self):

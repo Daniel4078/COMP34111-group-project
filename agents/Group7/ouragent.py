@@ -64,7 +64,7 @@ class Ouragent():
                         self.make_move()
                 elif s[3] == self.colour:
                     action = [int(x) for x in s[1].split(",")]
-                    print(action)
+                    # print(action)
                     self.board.set_tile_colour(action[0], action[1], Colour.from_char(self.opp_colour()))
                     # print("current")
                     print(self.board.print_board())
@@ -213,18 +213,20 @@ class Ouragent():
         state_step = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), self.player_num), axis=0)
         Q_values = self.step_model.predict(state_step.reshape((1, 2, 11, 11, 1)), verbose=0)
         indexes = np.argsort(Q_values[0])[::-1]
+        
 
         moves = []
         i = 0
         index = 0
         while i < 4:
+            # print(index)
             position = indexes[index]
             x, y = divmod(position, 11)
             if tiles[x][y].get_colour() is None:
                 moves.append((x, y))
                 i += 1
             index += 1
-        print(moves)
+        # print(moves)
         return moves
 
     def opp_colour(self):

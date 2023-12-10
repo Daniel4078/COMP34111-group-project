@@ -99,7 +99,7 @@ with strategy.scope():
     model2 = keras.models.load_model(r"hex_agent_model2.keras")
     
 # tensorboard
-log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+log_dir = "gs://hexgamelog/log"
 file_writer = tf.summary.create_file_writer(log_dir)
 
 # Training parameters
@@ -209,7 +209,7 @@ for episode in range(num_episodes):
         
         # Record loss to TensorBoard
         with file_writer.as_default():
-            tf.summary.scalar('q_values', Q_values, step=step)
+            tf.summary.scalar('episode', episode, step=step)
             step += 1
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
@@ -225,7 +225,7 @@ for episode in range(num_episodes):
         
         # Record loss to TensorBoard
         with file_writer.as_default():
-            tf.summary.scalar('q_values', Q_values, step=step)
+            tf.summary.scalar('episode', episode, step=step)
             step += 1
 
         total_reward += -1
@@ -241,7 +241,7 @@ for episode in range(num_episodes):
         
         # Record loss to TensorBoard
         with file_writer.as_default():
-            tf.summary.scalar('q_values', Q_values, step=step)
+            tf.summary.scalar('episode', episode, step=step)
             step += 1
 
     # Penalty for illegal moves
@@ -255,7 +255,7 @@ for episode in range(num_episodes):
         
         # Record loss to TensorBoard
         with file_writer.as_default():
-            tf.summary.scalar('q_values', Q_values, step=step)
+            tf.summary.scalar('episode', episode, step=step)
             step += 1
 
     training_time = time.time() - startTime

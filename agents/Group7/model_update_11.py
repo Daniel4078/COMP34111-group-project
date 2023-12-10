@@ -1,5 +1,8 @@
 import random
 import keras
+import tensorflow as tf
+import os
+import datetime
 import numpy as np
 import csv
 import time
@@ -9,10 +12,6 @@ sys.path.append(r"src")
 
 from Game import Game
 from Colour import Colour
-
-# Load model
-model = keras.models.load_model(r"hex_agent_model.keras")
-model2 = keras.models.load_model(r"hex_agent_model2.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
@@ -92,11 +91,23 @@ def update_q_values_illegal(state, action, reward, model):
     Q_values[0, action] = reward
     return Q_values
 
+strategy = tf.distribute.MultiWorkerMirroredStrategy()
+
+with strategy.scope():
+# Load model
+    model = keras.models.load_model(r"hex_agent_model.keras")
+    model2 = keras.models.load_model(r"hex_agent_model2.keras")
+    
+# tensorboard
+log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+file_writer = tf.summary.create_file_writer(log_dir)
+
 # Training parameters
-num_episodes = 15
+num_episodes = 10
 win = 0
 total_training_time = 0
 csv_file_path = 'board_evaluation.csv'
+step = 0
 
 for episode in range(num_episodes):
     # Initialization
@@ -195,6 +206,11 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model.train_on_batch(States[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        
+        # Record loss to TensorBoard
+        with file_writer.as_default():
+            tf.summary.scalar('q_values', Q_values, step=step)
+            step += 1
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
 
@@ -206,6 +222,11 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model.train_on_batch(illegal_states[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        
+        # Record loss to TensorBoard
+        with file_writer.as_default():
+            tf.summary.scalar('q_values', Q_values, step=step)
+            step += 1
 
         total_reward += -1
 
@@ -217,6 +238,11 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model2.train_on_batch(States2[move_num].reshape((1, 2, 11, 11, 1)), Q_values2)
+        
+        # Record loss to TensorBoard
+        with file_writer.as_default():
+            tf.summary.scalar('q_values', Q_values, step=step)
+            step += 1
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states2)):
@@ -226,6 +252,11 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model2.train_on_batch(illegal_states2[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        
+        # Record loss to TensorBoard
+        with file_writer.as_default():
+            tf.summary.scalar('q_values', Q_values, step=step)
+            step += 1
 
     training_time = time.time() - startTime
     total_training_time += training_time

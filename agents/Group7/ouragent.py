@@ -3,8 +3,6 @@ import random
 import sys
 import numpy as np
 from tensorflow import keras
-import time
-sys.path.append(r"C:/Users/ttt/Desktop/COMP34111-group-project/src")
 from Board import Board
 from Colour import Colour
 

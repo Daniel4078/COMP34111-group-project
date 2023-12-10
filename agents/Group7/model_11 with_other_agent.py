@@ -214,9 +214,10 @@ for episode in range(num_episodes):
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 11, 11, 1))
         print(state.reshape(11, 11))
-        
-        
-        
+
+        state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
+        States_eval.append(state_eval)
+        Actions.append(action)
 
         if game.get_board().has_ended():
             break

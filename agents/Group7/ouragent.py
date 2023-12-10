@@ -1,6 +1,5 @@
 import socket
 import random
-import sys
 import numpy as np
 from tensorflow import keras
 from Board import Board

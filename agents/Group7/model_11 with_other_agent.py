@@ -166,7 +166,7 @@ for episode in range(num_episodes):
     Actions = []
 
     States2 = []
-    States_eval2 = []
+    States2_eval = []
     Actions2 = []
 
     illegal_states = []
@@ -221,8 +221,8 @@ for episode in range(num_episodes):
         state = state.reshape((1, 11, 11, 1))
         # print(state.reshape(11, 11))
 
-        state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
-        States_eval2.append(state_eval)
+        state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
+        States2_eval.append(state2_eval)
         # Convert action
         action2 = action2[0] * 11 + action2[1]
         Actions2.append(action2)
@@ -276,7 +276,7 @@ for episode in range(num_episodes):
             csv_writer.writerow(list(States_eval[move_num]) + [board_scores[move_num]])
 
     board_scores = []
-    for move_num in range(len(States_eval2)):
+    for move_num in range(len(States2_eval)):
         if game.get_board().get_winner() == agent_color:
             board_scores.insert(0, -1 * (0.86**move_num))
         else:
@@ -284,9 +284,9 @@ for episode in range(num_episodes):
 
     with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
-        for move_num in range(len(States_eval2)):
+        for move_num in range(len(States2_eval)):
             # Save the state and board score to the CSV file
-            csv_writer.writerow(list(States_eval2[move_num]) + [board_scores[move_num]])
+            csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
 
 
     print(Q_values)

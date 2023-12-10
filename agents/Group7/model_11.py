@@ -13,7 +13,7 @@ from Colour import Colour
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
-epsilon = 0.5  # Exploration-exploitation trade-off
+epsilon = 0.45  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 

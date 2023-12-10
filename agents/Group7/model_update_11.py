@@ -16,7 +16,7 @@ model2 = keras.models.load_model(r"hex_agent_model2.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
-epsilon = 0.5  # Exploration-exploitation trade-off
+epsilon = 0.45  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 
@@ -260,7 +260,6 @@ for episode in range(num_episodes):
 
     print(Q_values)
     print(state.reshape(11, 11))
-    print(illegal_moves)
     # Decay epsilon for exploration-exploitation trade-off
     epsilon *= epsilon_decay
     epsilon = max(min_epsilon, epsilon)
@@ -269,6 +268,7 @@ for episode in range(num_episodes):
     if game.get_board().get_winner() == agent_color:
         win += 1
     
+    print(f"Illegal moves in this round: {illegal_moves}")
     print(f"Episode: {episode + 1}, Total Reward: {total_reward}, Agent Colour: {agent_color}")
     print(f"Runing time: {run_time}, Training time: {training_time}")
     print(f"Winner: {game.get_board().get_winner()}")

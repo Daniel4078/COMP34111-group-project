@@ -10,7 +10,7 @@ def preprocess_input(input_array):
     flat_list = [int(num) for num in re.findall(r'\b\d+\b', str(input_array))]
     
     # Convert the list to a NumPy array with the desired shape
-    array_2d = np.array(flat_list).reshape(2, 6, 6, 1)
+    array_2d = np.array(flat_list).reshape(2, 11, 11, 1)
     
     return array_2d
 
@@ -29,7 +29,7 @@ def preprocess_input(input_array):
 # ])
 
 model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(2, 6, 6, 1)),
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(2, 11, 11, 1)),
     layers.BatchNormalization(),
     layers.Flatten(),
     layers.Dense(128, activation='relu'),  
@@ -42,7 +42,7 @@ model = models.Sequential([
 # Compile the model with appropriate loss and optimizer for regression
 model.compile(optimizer='adam', loss='mean_squared_error')
 
-df = pd.read_csv("board_evaluation.csv")
+df = pd.read_csv(r"C:\Users\ttt\Desktop\COMP34111-group-project\board_evaluation.csv")
 X = df.iloc[:, :2].values
 y = df.iloc[:, 2].values
 
@@ -52,7 +52,7 @@ X_train = np.array([preprocess_input(x) for x in X_train])
 X_test = np.array([preprocess_input(x) for x in X_test])
 
 # Training
-history = model.fit(X_train, y_train, epochs=50, validation_data=(X_test, y_test), batch_size=32)
+history = model.fit(X_train, y_train, epochs=35, validation_data=(X_test, y_test), batch_size=32)
 
 # Visualize the training loss over epochs
 plt.plot(history.history['loss'], label='Training Loss')

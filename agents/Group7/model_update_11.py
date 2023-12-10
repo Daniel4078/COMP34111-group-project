@@ -5,18 +5,18 @@ import csv
 import time
 
 import sys
-sys.path.append(r"D:\Programming\COMP34111-group-project\src")
+sys.path.append(r"src")
 
 from Game import Game
 from Colour import Colour
 
 # Load model
-model = keras.models.load_model("D:\Programming\COMP34111-group-project\hex_agent_model.keras")
-model2 = keras.models.load_model("D:\Programming\COMP34111-group-project\hex_agent_model.keras")
+model = keras.models.load_model(r"hex_agent_model.keras")
+model2 = keras.models.load_model(r"hex_agent_model2.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
-epsilon = 1.0  # Exploration-exploitation trade-off
+epsilon = 0.5  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 
@@ -93,7 +93,7 @@ def update_q_values_illegal(state, action, reward, model):
     return Q_values
 
 # Training parameters
-num_episodes = 50
+num_episodes = 15
 win = 0
 total_training_time = 0
 csv_file_path = 'board_evaluation.csv'
@@ -279,4 +279,4 @@ print(f"Total training time: {total_training_time}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')
-model2.save('hex_agent_model2.keras')
+model.save('hex_agent_model2.keras')

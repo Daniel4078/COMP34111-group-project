@@ -17,7 +17,7 @@ model = keras.models.load_model("hex_agent_model.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
-epsilon = 1.0  # Exploration-exploitation trade-off
+epsilon = 0.45  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 
@@ -73,6 +73,8 @@ def choose_action(state, epsilon, model, state_player):
     num_selection = 1
     Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)))
     indexes = np.argsort(Q_values[0])[::-1]
+    print(f"The state: {state.reshape(11, 11)}")
+    print(f"Q: {Q_values}")
     while True:
         # Exploit - choose the action with the highest Q-value
         action = indexes[num_selection]
@@ -106,15 +108,18 @@ def update_q_values_illegal(state, action, reward, model):
     return Q_values
 
 # Training parameters
-num_episodes = 50
+num_episodes = 250
 win = 0
 csv_file_path = 'board_evaluation.csv'
 
 for episode in range(num_episodes):
     # Initialization
     game = Game(board_size=11)
-    # agent_color = random.choice([Colour.RED, Colour.BLUE])
-    agent_color = Colour.RED
+    agent_color = random.choice([Colour.RED, Colour.BLUE])
+    # agent_color = Colour.RED
+    # agent_color = Colour.BLUE
+    
+    
     if agent_color == Colour.RED:
         player2_color = "B"
         player2 = Colour.BLUE

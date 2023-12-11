@@ -1,14 +1,12 @@
 import random
 import keras
 import tensorflow as tf
-import os
-import datetime
 import numpy as np
 import csv
 import time
 
 import sys
-sys.path.append(r"src")
+sys.path.append(r"D:\Programming\COMP34111-group-project\src")
 
 from Game import Game
 from Colour import Colour
@@ -41,7 +39,7 @@ def calculate_reward(game, agent_color):
     if game.get_board().get_winner() == agent_color:
         return 10  # Positive reward for winning
     else:
-        return -10  # Negative reward for losing
+        return -5  # Negative reward for losing
 
 
 def choose_action(state, epsilon, model, player_num, state_player):
@@ -54,7 +52,7 @@ def choose_action(state, epsilon, model, player_num, state_player):
                 return action, row, col
 
     num_selection = 1
-    Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)), verbose=0)
     indexes = np.argsort(Q_values[0])[::-1]
     while True:
         # Exploit - choose the action with the highest Q-value
@@ -80,27 +78,21 @@ def update_q_values(state, action, States, reward, done, model):
     if not done:
         next_state = States[move_num + 1]
 
-        Q_values_next = model.predict(next_state.reshape((1, 2, 11, 11, 1)))
+        Q_values_next = model.predict(next_state.reshape((1, 2, 11, 11, 1)), verbose=0)
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)), verbose=0)
     Q_values[0, action] = target
     return Q_values
 
 def update_q_values_illegal(state, action, reward, model):
-    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)), verbose=0)
     Q_values[0, action] = reward
     return Q_values
 
-strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
-with strategy.scope():
-# Load model
-    model = keras.models.load_model(r"hex_agent_model.keras")
-    model2 = keras.models.load_model(r"hex_agent_model2.keras")
+model = keras.models.load_model(r"D:\Programming\COMP34111-group-project\hex_agent_model.keras")
+model2 = keras.models.load_model(r"D:\Programming\COMP34111-group-project\hex_agent_model2.keras")
     
-# tensorboard
-log_dir = "gs://hexgamelog/log"
-file_writer = tf.summary.create_file_writer(log_dir)
 
 # Training parameters
 num_episodes = 10
@@ -206,13 +198,10 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model.train_on_batch(States[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
-        
-        # Record loss to TensorBoard
-        with file_writer.as_default():
-            tf.summary.scalar('episode', episode, step=step)
-            step += 1
-
+    
         total_reward += 0.9**(len(States) - move_num - 1) * reward
+
+    print(Q_values)
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states)):
@@ -223,11 +212,6 @@ for episode in range(num_episodes):
         # Train the model on the updated Q-values
         model.train_on_batch(illegal_states[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
         
-        # Record loss to TensorBoard
-        with file_writer.as_default():
-            tf.summary.scalar('episode', episode, step=step)
-            step += 1
-
         total_reward += -1
 
     # Train the second model
@@ -239,10 +223,6 @@ for episode in range(num_episodes):
         # Train the model on the updated Q-values
         model2.train_on_batch(States2[move_num].reshape((1, 2, 11, 11, 1)), Q_values2)
         
-        # Record loss to TensorBoard
-        with file_writer.as_default():
-            tf.summary.scalar('episode', episode, step=step)
-            step += 1
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states2)):
@@ -252,11 +232,7 @@ for episode in range(num_episodes):
         
         # Train the model on the updated Q-values
         model2.train_on_batch(illegal_states2[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
-        
-        # Record loss to TensorBoard
-        with file_writer.as_default():
-            tf.summary.scalar('episode', episode, step=step)
-            step += 1
+    
 
     training_time = time.time() - startTime
     total_training_time += training_time
@@ -289,7 +265,7 @@ for episode in range(num_episodes):
             csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
 
 
-    print(Q_values)
+    # print(Q_values)
     print(state.reshape(11, 11))
     # Decay epsilon for exploration-exploitation trade-off
     epsilon *= epsilon_decay

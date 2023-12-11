@@ -3,6 +3,7 @@ from keras import layers, models
 import tensorflow as tf
 import numpy as np
 import csv
+import os
 
 import sys
 sys.path.append(r"D:\Programming\COMP34111-group-project\src")
@@ -16,6 +17,8 @@ gamma = 0.9  # Discount factor
 epsilon = 0.45  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
+
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 # Assume the Hex board is represented as a 2D array, where 0 represents an empty cell,
 # 1 represents Player 1, and 2 represents Player 2.
@@ -39,7 +42,7 @@ def calculate_reward(game, agent_color):
     if game.get_board().get_winner() == agent_color:
         return 10  # Positive reward for winning
     else:
-        return -10  # Negative reward for losing
+        return -5  # Negative reward for losing
 
 
 def choose_action(state, epsilon, model, player_num, state_player):
@@ -92,27 +95,20 @@ def update_q_values_illegal(state, action, reward, model):
 def create_model(input_shape=(2, 11, 11, 1)):
     model = models.Sequential()
 
-    # First Convolutional Block
-    model.add(layers.Conv2D(64, (3, 3), activation='relu', padding='same', input_shape=input_shape))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Conv2D(64, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same', input_shape=input_shape))
 
-    # Second Convolutional Block
-    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization())
+    for _ in range(10):
+        model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
+        model.add(layers.BatchNormalization(epsilon=1e-5))
 
-    # Third Convolutional Block
-    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization())
+    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization(epsilon=1e-5))
+
+    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
+    model.add(layers.BatchNormalization(epsilon=1e-5))
 
     # Flatten and Dense layers
     model.add(layers.Flatten())
-    model.add(layers.Dense(256, activation='relu'))
     model.add(layers.Dropout(0.5))
     model.add(layers.Dense(121, activation='linear', name='q_values')) # output layer
 

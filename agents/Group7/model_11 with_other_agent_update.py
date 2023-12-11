@@ -108,7 +108,7 @@ def update_q_values_illegal(state, action, reward, model):
     return Q_values
 
 # Training parameters
-num_episodes = 250
+num_episodes = 5
 win = 0
 total_training_time = 0
 csv_file_path = 'board_evaluation.csv'
@@ -196,7 +196,7 @@ for episode in range(num_episodes):
         
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 11, 11, 1))
-        # print(state.reshape(11, 11))
+        print(state.reshape(11, 11))
 
         state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
         States2_eval.append(state2_eval)

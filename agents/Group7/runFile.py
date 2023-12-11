@@ -2,10 +2,10 @@ import subprocess
 import time
 
 # 训练脚本的路径
-training_script_path = r"agents\Group7\model_update_11.py"
+training_script_path = r"D:\Programming\COMP34111-group-project\agents\Group7\model_update_11.py"
 
 # 迭代次数
-num_iterations = 120
+num_iterations = 17
 
 # 每次迭代之间的等待时间（秒）
 wait_time = 2

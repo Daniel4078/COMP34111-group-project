@@ -9,7 +9,7 @@ import os
 import json
 
 import sys
-sys.path.append(r"C:\Users\ttt\Desktop\COMP34111-group-project\src")
+sys.path.append(r"src")
 
 from Game import Game
 from Colour import Colour
@@ -17,9 +17,9 @@ from Colour import Colour
 
 tf_config = {
     'cluster': {
-        'worker': ["192.168.0.20:8888"],
+        'worker': ["192.168.0.20:8888", "192.168.0.17:7777"],
     },
-    'task': {'type': 'worker', 'index': 0}
+    'task': {'type': 'worker', 'index': 1}
 }
 
 # SET TF_CONFIG
@@ -101,8 +101,8 @@ strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
 with strategy.scope():
 # Load model
-    model = keras.models.load_model(r"C:\Users\ttt\Desktop\COMP34111-group-project\hex_agent_model.keras")
-    model2 = keras.models.load_model(r"C:\Users\ttt\Desktop\COMP34111-group-project\hex_agent_model2.keras")
+    model = keras.models.load_model(r"D:\Programming\COMP34111-group-project\hex_agent_model.keras")
+    model2 = keras.models.load_model(r"D:\Programming\COMP34111-group-project\hex_agent_model2.keras")
 
 # model = keras.models.load_model(r"hex_agent_model.keras")
 # model2 = keras.models.load_model(r"hex_agent_model2.keras")

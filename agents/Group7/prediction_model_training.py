@@ -42,7 +42,7 @@ model = models.Sequential([
 # Compile the model with appropriate loss and optimizer for regression
 model.compile(optimizer='adam', loss='mean_squared_error')
 
-df = pd.read_csv(r"C:\Users\ttt\Desktop\COMP34111-group-project\board_evaluation.csv")
+df = pd.read_csv(r"board_evaluation.csv")
 X = df.iloc[:, :2].values
 y = df.iloc[:, 2].values
 

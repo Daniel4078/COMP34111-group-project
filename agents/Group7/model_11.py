@@ -1,9 +1,8 @@
 import random
 from keras import layers, models
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 import csv
-import os
 
 import sys
 sys.path.append(r"D:\Programming\COMP34111-group-project\src")
@@ -11,14 +10,12 @@ sys.path.append(r"D:\Programming\COMP34111-group-project\src")
 from Game import Game
 from Colour import Colour
 
-
 # Hyperparameters
 gamma = 0.9  # Discount factor
 epsilon = 0.45  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 # Assume the Hex board is represented as a 2D array, where 0 represents an empty cell,
 # 1 represents Player 1, and 2 represents Player 2.
@@ -129,7 +126,7 @@ model2.compile(optimizer='adam',
 
 
 # Training parameters
-num_episodes = 10
+num_episodes = 5
 win = 0
 csv_file_path = 'board_evaluation.csv'
 

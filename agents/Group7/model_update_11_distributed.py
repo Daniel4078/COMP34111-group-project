@@ -1,22 +1,23 @@
+import math
 import random
 import keras
 import tensorflow as tf
 import numpy as np
 import csv
 import time
+import os
+import json
 
 import sys
-sys.path.append(r"src")
+sys.path.append(r"C:\Users\ttt\Desktop\COMP34111-group-project\src")
 
 from Game import Game
 from Colour import Colour
 
-import os
-import json
 
 tf_config = {
     'cluster': {
-        'worker': ["10.204.221.75:8888", "10.204.79.204:7777"],
+        'worker': ["192.168.0.20:8888", "192.168.0.17:7777"],
     },
     'task': {'type': 'worker', 'index': 0}
 }
@@ -32,20 +33,13 @@ min_epsilon = 0.01
 
 # Assume the Hex board is represented as a 2D array, where 0 represents an empty cell,
 # 1 represents Player 1, and 2 represents Player 2.
-
-# Function to choose an action using epsilon-greedy policy
-def tile_to_state(tile):
-    colour = tile.get_colour()
-    if colour == Colour.RED:
-        return 1  # Assuming RED represents Player 1
-    elif colour == Colour.BLUE:
-        return 2  # Assuming BLUE represents Player 2
-    else:
-        return 0  # Assuming None or another value represents an empty tile
-    
-    
 def board_to_state(board_tiles):
-    return np.array([[tile_to_state(tile) for tile in row] for row in board_tiles])
+    board_array = np.array(board_tiles)
+    state = np.zeros(board_array.shape, dtype=np.int32)
+    state[board_array == Colour.RED] = 1
+    state[board_array == Colour.BLUE] = 2
+
+    return state
 
 
 def calculate_reward(game, agent_color):
@@ -106,8 +100,8 @@ strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
 with strategy.scope():
 # Load model
-    model = keras.models.load_model(r"hex_agent_model.keras")
-    model2 = keras.models.load_model(r"hex_agent_model2.keras")
+    model = keras.models.load_model(r"C:\Users\ttt\Desktop\COMP34111-group-project\hex_agent_model.keras")
+    model2 = keras.models.load_model(r"C:\Users\ttt\Desktop\COMP34111-group-project\hex_agent_model2.keras")
 
 # model = keras.models.load_model(r"hex_agent_model.keras")
 # model2 = keras.models.load_model(r"hex_agent_model2.keras")
@@ -302,18 +296,21 @@ print("")
 print(f"Winning rate: {win/(episode+1)}")
 print(f"Total training time: {total_training_time}")
 
+steps_per_epoch1 = math.ceil(len(total_states1) / 64)
+steps_per_epoch2 = math.ceil(len(total_states2) / 64)
+
 with strategy.scope():
-    # 创建数据集
     dataset1 = tf.data.Dataset.from_tensor_slices((total_states1, total_Q1))
-    dataset1 = dataset1.batch(64)  # 指定批量大小
+    dataset1 = dataset1.cache().prefetch(tf.data.AUTOTUNE).batch(64)
     dist_dataset1 = strategy.experimental_distribute_dataset(dataset1)
 
     dataset2 = tf.data.Dataset.from_tensor_slices((total_states2, total_Q2))
-    dataset2 = dataset2.batch(64)
+    dataset2 = dataset2.cache().prefetch(tf.data.AUTOTUNE).batch(64)
     dist_dataset2 = strategy.experimental_distribute_dataset(dataset2)
     
-    model.fit(dist_dataset1, epochs=10)
-    model2.fit(dist_dataset2, epochs=10)
+    model.fit(dist_dataset1, epochs=10, steps_per_epoch=steps_per_epoch1)
+    model2.fit(dist_dataset2, epochs=10, steps_per_epoch=steps_per_epoch2)
+
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')

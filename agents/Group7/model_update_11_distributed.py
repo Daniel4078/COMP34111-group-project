@@ -17,13 +17,14 @@ from Colour import Colour
 
 tf_config = {
     'cluster': {
-        'worker': ["192.168.0.20:8888", "192.168.0.17:7777"],
+        'worker': ["192.168.0.20:8888"],
     },
     'task': {'type': 'worker', 'index': 0}
 }
 
 # SET TF_CONFIG
 os.environ['TF_CONFIG'] = json.dumps(tf_config)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
@@ -301,15 +302,16 @@ steps_per_epoch2 = math.ceil(len(total_states2) / 64)
 
 with strategy.scope():
     dataset1 = tf.data.Dataset.from_tensor_slices((total_states1, total_Q1))
-    dataset1 = dataset1.cache().prefetch(tf.data.AUTOTUNE).batch(64)
+    dataset1 = dataset1.cache().prefetch(tf.data.AUTOTUNE).batch(64).repeat()
     dist_dataset1 = strategy.experimental_distribute_dataset(dataset1)
 
     dataset2 = tf.data.Dataset.from_tensor_slices((total_states2, total_Q2))
-    dataset2 = dataset2.cache().prefetch(tf.data.AUTOTUNE).batch(64)
+    dataset2 = dataset2.cache().prefetch(tf.data.AUTOTUNE).batch(64).repeat()
     dist_dataset2 = strategy.experimental_distribute_dataset(dataset2)
     
     model.fit(dist_dataset1, epochs=10, steps_per_epoch=steps_per_epoch1)
     model2.fit(dist_dataset2, epochs=10, steps_per_epoch=steps_per_epoch2)
+
 
 
 # Save the trained model for future use

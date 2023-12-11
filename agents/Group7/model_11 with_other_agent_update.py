@@ -8,6 +8,7 @@ from EnemyAgent import EnemyAgent
 import time
 
 import sys
+
 sys.path.append(r"src")
 
 from Game import Game
@@ -22,6 +23,7 @@ epsilon = 0.45  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 
+
 # Assume the Hex board is represented as a 2D array, where 0 represents an empty cell,
 # 1 represents Player 1, and 2 represents Player 2.
 
@@ -33,9 +35,9 @@ def tile_to_state(tile):
     elif colour == Colour.BLUE:
         return 2  # Assuming BLUE represents Player 2
     else:
-        return 0 # Assuming None or another value represents an empty tile
-    
-    
+        return 0  # Assuming None or another value represents an empty tile
+
+
 def state_transfer(state):
     transformed_state = []
     for row in state:
@@ -49,8 +51,8 @@ def state_transfer(state):
                 transformed_row.append("0")
         transformed_state.append(transformed_row)
     return np.array(transformed_state)
-    
-    
+
+
 def board_to_state(board_tiles):
     return np.array([[tile_to_state(tile) for tile in row] for row in board_tiles])
 
@@ -62,50 +64,50 @@ def calculate_reward(game, agent_color):
         return -10  # Negative reward for losing
 
 
-def choose_action(state, epsilon, model, state_player):
+def choose_action(state, epsilon, model):
+    board = state.reshape(11, 11)
     if np.random.rand() < epsilon:
         # Explore - choose a random action
         while True:
-            action =  np.random.randint(0, 121)
+            action = np.random.randint(0, 121)
             row, col = divmod(action, 11)
-            if state.reshape(11, 11)[row, col] == 0:
+            if board[row][col] == 0:
                 return action, row, col
 
     num_selection = 1
-    Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)), verbose=0)
-    indexes = np.argsort(Q_values[0])[::-1]
-    # print(f"The state: {state.reshape(11, 11)}")
-    # print(f"Q: {Q_values}")
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)))[0]
+    indexes = np.argsort(Q_values)[::-1]
     while True:
         # Exploit - choose the action with the highest Q-value
         action = indexes[num_selection]
-
         # Check it has been occupied
         row, col = divmod(action, 11)
-        if state.reshape(11, 11)[row, col] != 0:
+        if board[row][col] != 0:
             # Store the illegal moves
-
-            illegal_states.append(state_player)
+            illegal_states.append(state)
             illegal_moves.append(action)
             num_selection += 1
         else:
             return action, row, col
+
 
 # Function to update Q-values using Q-learning update rule
 def update_q_values(state, action, States, reward, done, model):
     target = reward
     if not done:
         next_state = States[move_num + 1]
-        Q_values_next = model.predict(next_state.reshape((1, 2, 11, 11, 1)))
+        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)))
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
     Q_values[0, action] = target
     return Q_values
 
+
 def update_q_values_illegal(state, action, reward, model):
-    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
     Q_values[0, action] = reward
     return Q_values
+
 
 # Training parameters
 num_episodes = 5
@@ -119,8 +121,7 @@ for episode in range(num_episodes):
     agent_color = random.choice([Colour.RED, Colour.BLUE])
     # agent_color = Colour.RED
     # agent_color = Colour.BLUE
-    
-    
+
     if agent_color == Colour.RED:
         player2_color = "B"
         player2 = Colour.BLUE
@@ -131,14 +132,14 @@ for episode in range(num_episodes):
         player2 = Colour.RED
         player1_num = 2
         player2_num = 1
-    
+
     start = True
     tiles = game.get_board().get_tiles()
     state = board_to_state(tiles)
     state = state.reshape((1, 11, 11, 1))
 
     total_reward = 0
-    
+
     # To store every board state during one game
     States = []
     States_eval = []
@@ -150,7 +151,7 @@ for episode in range(num_episodes):
 
     illegal_states = []
     illegal_moves = []
-    
+
     enemyAgent = EnemyAgent()
     turn = 1
 
@@ -160,20 +161,20 @@ for episode in range(num_episodes):
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
             # Add the state before move
-            state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
-            States.append(state_player)
+            States.append(state)
 
             # Choose action
-            action, row, col = choose_action(state, epsilon, model, state_player)
+            action, row, col = choose_action(state, epsilon, model)
 
             # Make move
             game.get_board().set_tile_colour(row, col, agent_color)
-            
+
             # Store the state_eval and action after player1 move
             state = board_to_state(game.get_board().get_tiles())
             state = state.reshape((1, 11, 11, 1))
 
-            state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
+            state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num),
+                                   axis=0)
             States_eval.append(state_eval)
             Actions.append(action)
 
@@ -183,63 +184,65 @@ for episode in range(num_episodes):
         start = False
         # Player2 
         # Add the state before move
-        state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
-        States2.append(state_player)
-        
+        States2.append(state)
+
         state_str = state_transfer(state.reshape(11, 11))
-    
+
         action2 = enemyAgent.run(player2_color, state_str, turn)
 
         game.get_board().set_tile_colour(action2[0], action2[1], player2)
-        
+
         turn += 1
-        
+
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 11, 11, 1))
         print(state.reshape(11, 11))
 
-        state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
+        state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num),
+                                axis=0)
         States2_eval.append(state2_eval)
         # Convert action
         action2 = action2[0] * 11 + action2[1]
         Actions2.append(action2)
-        
+
         if game.get_board().has_ended():
             break
-    run_time = time.time() - startTime    
-    
+    run_time = time.time() - startTime
+
     startTime = time.time()
     # Give reward
     reward = calculate_reward(game, agent_color)
     for move_num in range(len(States) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
-            States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
-        
-        # Train the model on the updated Q-values
-        model.train_on_batch(States[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+            States[move_num], Actions[move_num], States, (0.9 ** (len(States) - move_num - 1)) * reward,
+                                                         (move_num + 1) == len(States), model)
 
-        total_reward += 0.9**(len(States) - move_num - 1) * reward
-    
+        # Train the model on the updated Q-values
+        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
+        total_reward += 0.9 ** (len(States) - move_num - 1) * reward
+
     for move_num in range(len(States2) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
-            States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model)
-        
+            States2[move_num], Actions2[move_num], States2, (0.9 ** (len(States2) - move_num - 1)) * (-reward),
+                                                            (move_num + 1) == len(States2), model)
+
         # Train the model on the updated Q-values
-        model.train_on_batch(States2[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
+        total_reward += 0.9 ** (len(States) - move_num - 1) * reward
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states)):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values_illegal(
             illegal_states[move_num], illegal_moves[move_num], -1, model)
-        
+
         # Train the model on the updated Q-values
-        model.train_on_batch(illegal_states[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
 
         total_reward += -1
-    
+
     training_time = time.time() - startTime
     total_training_time += training_time
 
@@ -247,9 +250,9 @@ for episode in range(num_episodes):
     board_scores = []
     for move_num in range(len(States_eval)):
         if game.get_board().get_winner() == agent_color:
-            board_scores.insert(0, 1 * (0.86**move_num))
+            board_scores.insert(0, 1 * (0.86 ** move_num))
         else:
-            board_scores.insert(0, -1 * (0.86**move_num))
+            board_scores.insert(0, -1 * (0.86 ** move_num))
 
     with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
@@ -260,16 +263,15 @@ for episode in range(num_episodes):
     board_scores = []
     for move_num in range(len(States2_eval)):
         if game.get_board().get_winner() == agent_color:
-            board_scores.insert(0, -1 * (0.86**move_num))
+            board_scores.insert(0, -1 * (0.86 ** move_num))
         else:
-            board_scores.insert(0, 1 * (0.86**move_num))
+            board_scores.insert(0, 1 * (0.86 ** move_num))
 
     with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
         for move_num in range(len(States2_eval)):
             # Save the state and board score to the CSV file
             csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
-
 
     print(Q_values)
     print(state.reshape(11, 11))
@@ -280,14 +282,14 @@ for episode in range(num_episodes):
     # Record the winning number
     if game.get_board().get_winner() == agent_color:
         win += 1
-    
+
     print(f"Illegal moves in this round: {illegal_moves}")
     print(f"Episode: {episode + 1}, Total Reward: {total_reward}, Agent Colour: {agent_color}")
     print(f"Runing time: {run_time}, Training time: {training_time}")
     print(f"Winner: {game.get_board().get_winner()}")
 
 print("")
-print(f"Winning rate: {win/(episode+1)}")
+print(f"Winning rate: {win / (episode + 1)}")
 print(f"Total training time: {total_training_time}")
 
 # Save the trained model for future use

@@ -1,5 +1,5 @@
 import random
-from keras import layers, models
+from keras import layers, models, losses
 # import tensorflow as tf
 import numpy as np
 import csv
@@ -42,31 +42,31 @@ def calculate_reward(game, agent_color):
         return -5  # Negative reward for losing
 
 
-def choose_action(state, epsilon, model, player_num, state_player):
+def choose_action(state, epsilon, model, player_num):
+    board = state.reshape(11,11)
     if np.random.rand() < epsilon:
         # Explore - choose a random action
         while True:
             action =  np.random.randint(0, 121)
             row, col = divmod(action, 11)
-            if state.reshape(11, 11)[row, col] == 0:
+            if board[row][col] == 0:
                 return action, row, col
 
     num_selection = 1
-    Q_values = model.predict(state_player.reshape((1, 2, 11, 11, 1)))
-    indexes = np.argsort(Q_values[0])[::-1]
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)))[0]
+    indexes = np.argsort(Q_values)[::-1]
     while True:
         # Exploit - choose the action with the highest Q-value
         action = indexes[num_selection]
-
         # Check it has been occupied
         row, col = divmod(action, 11)
-        if state.reshape(11, 11)[row, col] != 0:
+        if board[row][col] != 0:
             # Store the illegal moves
             if player_num == 1:
-                illegal_states.append(state_player)
+                illegal_states.append(state)
                 illegal_moves.append(action)
             else:
-                illegal_states2.append(state_player)
+                illegal_states2.append(state)
                 illegal_moves2.append(action)
             num_selection += 1
         else:
@@ -77,56 +77,52 @@ def update_q_values(state, action, States, reward, done, model):
     target = reward
     if not done:
         next_state = States[move_num + 1]
-
-        Q_values_next = model.predict(next_state.reshape((1, 2, 11, 11, 1)))
+        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)))
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
     Q_values[0, action] = target
     return Q_values
 
 def update_q_values_illegal(state, action, reward, model):
-    Q_values = model.predict(state.reshape((1, 2, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
     Q_values[0, action] = reward
     return Q_values
 
-def create_model(input_shape=(2, 11, 11, 1)):
-    model = models.Sequential()
-
-    model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same', input_shape=input_shape))
-
-    for _ in range(10):
-        model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
-        model.add(layers.BatchNormalization(epsilon=1e-5))
-
-    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization(epsilon=1e-5))
-
-    model.add(layers.Conv2D(128, (3, 3), activation='relu', padding='same'))
-    model.add(layers.BatchNormalization(epsilon=1e-5))
-
-    # Flatten and Dense layers
-    model.add(layers.Flatten())
-    model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(121, activation='linear', name='q_values')) # output layer
-
+def create_model():
+    input_shape = (11, 11, 1)
+    input = layers.Input(shape=input_shape)
+    a = layers.Conv2D(49, (5, 5), activation='relu', padding='same')(input)
+    b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(input)
+    sub = layers.Concatenate()([a, b])
+    y = layers.BatchNormalization(epsilon=1e-5)(sub)
+    for i in range(1, 4):
+        a = layers.Conv2D(49, (5, 5), activation='relu', padding='same')(y)
+        b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(y)
+        sub = layers.Concatenate()([a, b])
+        y = layers.BatchNormalization(epsilon=1e-5)(sub)
+    for i in range(4, 8):
+        y = layers.Conv2D(130, (3, 3), activation='relu', padding='same')(y)
+        y = layers.BatchNormalization(epsilon=1e-5)(y)
+    out = layers.Dense(1, activation='sigmoid', name='q_values')(y)
+    out = layers.Reshape((121,))(out)
+    model = models.Model(inputs=input, outputs=out)
+    model.summary()
     return model
 
 
 model = create_model()
 # Compile the model with loss
 model.compile(optimizer='adam',
-              loss={'q_values': 'mean_squared_error'},
-              loss_weights={'q_values': 1.0})
+              loss=losses.MeanSquaredError(name="mean_squared_error"))
 
 model2 = create_model()
 # Compile the model with loss
 model2.compile(optimizer='adam',
-              loss={'q_values': 'mean_squared_error'},
-              loss_weights={'q_values': 1.0})
+              loss=losses.MeanSquaredError(name="mean_squared_error"))
 
 
 # Training parameters
-num_episodes = 5
+num_episodes = 1
 win = 0
 csv_file_path = 'board_evaluation.csv'
 
@@ -170,11 +166,10 @@ for episode in range(num_episodes):
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
             # Add the state before move
-            state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
-            States.append(state_player)
+            States.append(state)
 
             # Choose action
-            action, row, col = choose_action(state, epsilon, model, player1_num, state_player)
+            action, row, col = choose_action(state, epsilon, model, player1_num)
 
             # Make move
             game.get_board().set_tile_colour(row, col, agent_color)
@@ -182,9 +177,7 @@ for episode in range(num_episodes):
             # Store the state_eval and action after player1 move
             state = board_to_state(game.get_board().get_tiles())
             state = state.reshape((1, 11, 11, 1))
-
-            state_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player1_num), axis=0)
-            States_eval.append(state_eval)
+            States_eval.append(state)
             Actions.append(action)
 
             if game.get_board().has_ended():
@@ -193,11 +186,10 @@ for episode in range(num_episodes):
         start = False
         # Player2 
         # Add the state before move
-        state_player = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
-        States2.append(state_player)
+        States2.append(state)
 
         # Choose action
-        action2, row, col = choose_action(state, epsilon, model2, player2_num, state_player)
+        action2, row, col = choose_action(state, epsilon, model2, player2_num)
         # Make move
         game.get_board().set_tile_colour(row, col, player2)
 
@@ -205,8 +197,7 @@ for episode in range(num_episodes):
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 11, 11, 1))
 
-        state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num), axis=0)
-        States2_eval.append(state2_eval)
+        States2_eval.append(state)
         Actions2.append(action2)
 
         if game.get_board().has_ended():
@@ -220,7 +211,7 @@ for episode in range(num_episodes):
             States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
         
         # Train the model on the updated Q-values
-        model.train_on_batch(States[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
 
         total_reward += 0.9**(len(States) - move_num - 1) * reward
 
@@ -231,7 +222,7 @@ for episode in range(num_episodes):
             illegal_states[move_num], illegal_moves[move_num], -1, model)
         
         # Train the model on the updated Q-values
-        model.train_on_batch(illegal_states[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
 
         total_reward += -1
 
@@ -242,7 +233,7 @@ for episode in range(num_episodes):
             States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
         
         # Train the model on the updated Q-values
-        model2.train_on_batch(States2[move_num].reshape((1, 2, 11, 11, 1)), Q_values2)
+        model2.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values2, batch_size=1, epochs = 2)
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states2)):
@@ -251,7 +242,7 @@ for episode in range(num_episodes):
             illegal_states2[move_num], illegal_moves2[move_num], -1, model2)
         
         # Train the model on the updated Q-values
-        model2.train_on_batch(illegal_states2[move_num].reshape((1, 2, 11, 11, 1)), Q_values)
+        model2.fit(illegal_states2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
 
     # Prepare samples for evaluation model 
     board_scores = []

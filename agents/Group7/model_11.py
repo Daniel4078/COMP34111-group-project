@@ -3,11 +3,6 @@ from keras import layers, models
 import tensorflow as tf
 import numpy as np
 import csv
-import os
-
-import sys
-sys.path.append(r"D:\Programming\COMP34111-group-project\src")
-
 from Game import Game
 from Colour import Colour
 
@@ -96,7 +91,7 @@ def create_model(input_shape=(2, 11, 11, 1)):
     model = models.Sequential()
 
     model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same', input_shape=input_shape))
-
+    model.add(layers.BatchNormalization())
     for _ in range(10):
         model.add(layers.Conv2D(256, (3, 3), activation='relu', padding='same'))
         model.add(layers.BatchNormalization(epsilon=1e-5))

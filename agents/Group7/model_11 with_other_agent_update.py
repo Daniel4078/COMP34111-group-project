@@ -1,7 +1,5 @@
 import random
 import keras
-from keras import layers, models
-import tensorflow as tf
 import numpy as np
 import csv
 from EnemyAgent import EnemyAgent
@@ -10,14 +8,12 @@ import SPOILER_new
 from Game import Game
 from Colour import Colour
 
-print(keras.__version__)
-
 # Load model
 model = keras.models.load_model("hex_agent_model.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
-epsilon = 0.45  # Exploration-exploitation trade-off
+epsilon = 0.35  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 
@@ -153,7 +149,7 @@ for episode in range(num_episodes):
 
     # enemyAgent = EnemyAgent()
     enemyAgent = SPOILER_new.MCTSAgent()
-    turn = 1
+    turn = 0
 
     # Set timeer
     startTime = time.time()
@@ -276,8 +272,9 @@ for episode in range(num_episodes):
     if game.get_board().get_winner() == agent_color:
         win += 1
 
+    print(state.reshape(11, 11))
     print(f"Illegal moves in this round: {illegal_moves}")
-    print(game.get_board().print_board())
+    # print(game.get_board().print_board())
     print(f"Episode: {episode + 1}, Total rounds: {turn}, Agent Colour: {agent_color}")
     print(f"Runing time: {run_time}, Training time: {training_time}")
     print(f"Winner: {game.get_board().get_winner()}")

@@ -6,11 +6,7 @@ import numpy as np
 import csv
 from EnemyAgent import EnemyAgent
 import time
-
-import sys
-
-sys.path.append(r"src")
-
+import SPOILER_new
 from Game import Game
 from Colour import Colour
 
@@ -153,7 +149,8 @@ for episode in range(num_episodes):
     illegal_states = []
     illegal_moves = []
 
-    enemyAgent = EnemyAgent()
+    # enemyAgent = EnemyAgent()
+    enemyAgent = SPOILER_new.MCTSAgent()
     turn = 1
 
     # Set timeer
@@ -189,7 +186,8 @@ for episode in range(num_episodes):
 
         state_str = state_transfer(state.reshape(11, 11))
 
-        action2 = enemyAgent.run(player2_color, state_str, turn)
+        # action2 = enemyAgent.run(player2_color, state_str, turn)
+        action2 = enemyAgent.play_out(game.get_board(), player2_color)
 
         game.get_board().set_tile_colour(action2[0], action2[1], player2)
 

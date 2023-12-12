@@ -116,8 +116,6 @@ class MCTSAgent:
         # |         Connects to the socket and jumps         |
         # |         to waiting for the start message         |
         # ----------------------------------------------------
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.connect((self.HOST, self.PORT))
 
         # ----------------------------------------
         # |         Initialise Variables         |
@@ -155,7 +153,7 @@ class MCTSAgent:
         temp = []
         for i in range(self.board_size):
             for j in range(self.board_size):
-                if Colour.get_char(self.board.get_tiles()[i][j].get_color()) == "0":
+                if Colour.get_char(self.board.get_tiles()[i][j].get_colour()) == "0":
                     temp.append((i, j))
         self.choices = temp
         return self.search()

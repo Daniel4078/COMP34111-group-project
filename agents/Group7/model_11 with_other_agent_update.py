@@ -10,6 +10,8 @@ import SPOILER_new
 from Game import Game
 from Colour import Colour
 
+print(keras.__version__)
+
 # Load model
 model = keras.models.load_model("hex_agent_model.keras")
 
@@ -218,7 +220,7 @@ for episode in range(num_episodes):
                                                          (move_num + 1) == len(States), model)
 
         # Train the model on the updated Q-values
-        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
+        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=3)
 
     for move_num in range(len(States2) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
@@ -226,7 +228,7 @@ for episode in range(num_episodes):
             States2[move_num], Actions2[move_num], States2, (0.9 ** (len(States2) - move_num - 1)) * (-reward),
                                                             (move_num + 1) == len(States2), model)
         # Train the model on the updated Q-values
-        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
+        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=3)
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states)):
@@ -234,7 +236,7 @@ for episode in range(num_episodes):
         Q_values = update_q_values_illegal(
             illegal_states[move_num], illegal_moves[move_num], -1, model)
         # Train the model on the updated Q-values
-        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
+        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=3)
 
     training_time = time.time() - startTime
     total_training_time += training_time

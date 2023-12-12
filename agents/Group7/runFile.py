@@ -2,7 +2,7 @@ import subprocess
 import time
 
 # 训练脚本的路径
-training_script_path = r"D:\COMP34111-group-project\agents\Group7\model_11 with_other_agent_update.py"
+training_script_path = r"C:\Users\ttt\Desktop\COMP34111-group-project\agents\Group7\model_11 with_other_agent_update.py"
 
 # 迭代次数
 num_iterations = 6*2

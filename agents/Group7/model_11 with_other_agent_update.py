@@ -110,9 +110,10 @@ def update_q_values_illegal(state, action, reward, model):
 
 
 # Training parameters
-num_episodes = 5
+num_episodes = 21*4
 win = 0
 total_training_time = 0
+total_time = time.time()
 csv_file_path = 'board_evaluation.csv'
 
 for episode in range(num_episodes):
@@ -196,7 +197,6 @@ for episode in range(num_episodes):
 
         state = board_to_state(game.get_board().get_tiles())
         state = state.reshape((1, 11, 11, 1))
-        print(state.reshape(11, 11))
 
         state2_eval = np.append(state, np.full((1, state.shape[1], state.shape[2], state.shape[3]), player2_num),
                                 axis=0)
@@ -209,6 +209,7 @@ for episode in range(num_episodes):
             break
     run_time = time.time() - startTime
 
+
     startTime = time.time()
     # Give reward
     reward = calculate_reward(game, agent_color)
@@ -220,28 +221,22 @@ for episode in range(num_episodes):
 
         # Train the model on the updated Q-values
         model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
-        total_reward += 0.9 ** (len(States) - move_num - 1) * reward
 
     for move_num in range(len(States2) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
             States2[move_num], Actions2[move_num], States2, (0.9 ** (len(States2) - move_num - 1)) * (-reward),
                                                             (move_num + 1) == len(States2), model)
-
         # Train the model on the updated Q-values
         model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
-        total_reward += 0.9 ** (len(States) - move_num - 1) * reward
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states)):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values_illegal(
             illegal_states[move_num], illegal_moves[move_num], -1, model)
-
         # Train the model on the updated Q-values
         model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
-
-        total_reward += -1
 
     training_time = time.time() - startTime
     total_training_time += training_time
@@ -273,8 +268,6 @@ for episode in range(num_episodes):
             # Save the state and board score to the CSV file
             csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
 
-    print(Q_values)
-    print(state.reshape(11, 11))
     # Decay epsilon for exploration-exploitation trade-off
     epsilon *= epsilon_decay
     epsilon = max(min_epsilon, epsilon)
@@ -284,13 +277,15 @@ for episode in range(num_episodes):
         win += 1
 
     print(f"Illegal moves in this round: {illegal_moves}")
-    print(f"Episode: {episode + 1}, Total Reward: {total_reward}, Agent Colour: {agent_color}")
+    print(game.get_board().print_board())
+    print(f"Episode: {episode + 1}, Total rounds: {turn}, Agent Colour: {agent_color}")
     print(f"Runing time: {run_time}, Training time: {training_time}")
     print(f"Winner: {game.get_board().get_winner()}")
 
 print("")
-print(f"Winning rate: {win / (episode + 1)}")
+print(f"Game statics (win/total): {win} / {episode + 1}")
 print(f"Total training time: {total_training_time}")
+print(f"Total time: {time.time()-total_time}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')

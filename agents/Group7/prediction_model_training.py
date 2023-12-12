@@ -1,4 +1,4 @@
-from keras import layers, models
+from keras import layers, models,losses
 import numpy as np
 import pandas as pd
 import re
@@ -27,24 +27,41 @@ def preprocess_input(input_array):
 #     layers.Dropout(0.5),
 #     layers.Dense(1, activation='tanh', name='board_eval'),
 # ])
+def create_model():
+    input_shape = (11, 11, 1)
+    input = layers.Input(shape=input_shape)
+    a = layers.Conv2D(49, (5, 5), activation='relu', padding='same')(input)
+    b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(input)
+    sub = layers.Concatenate()([a, b])
+    y = layers.BatchNormalization(epsilon=1e-5)(sub)
+    for i in range(1, 4):
+        a = layers.Conv2D(49, (5, 5), activation='relu', padding='same')(y)
+        b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(y)
+        sub = layers.Concatenate()([a, b])
+        y = layers.BatchNormalization(epsilon=1e-5)(sub)
+    for i in range(4, 8):
+        y = layers.Conv2D(130, (3, 3), activation='relu', padding='same')(y)
+        y = layers.BatchNormalization(epsilon=1e-5)(y)
+    y = layers.Conv2D(130, (5, 5), activation='relu')(y)
+    y = layers.Conv2D(130, (5, 5), activation='relu')(y)
+    y = layers.Conv2D(130, (3, 3), activation='relu')(y)
+    out = layers.Dense(1, activation='relu', name='q_values')(y)
+    model = models.Model(inputs=input, outputs=out)
+    model.summary()
+    return model
 
-model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(2, 11, 11, 1)),
-    layers.BatchNormalization(),
-    layers.Flatten(),
-    layers.Dense(128, activation='relu'),  
-    layers.Dropout(0.5),
-    layers.Dense(64, activation='relu'),  
-    layers.Dense(32, activation='relu'),   
-    layers.Dense(1, activation='tanh', name='board_eval'),
-])
+model = create_model()
 
 # Compile the model with appropriate loss and optimizer for regression
-model.compile(optimizer='adam', loss='mean_squared_error')
+model.compile(optimizer='adam',
+              loss=losses.MeanSquaredError(name="mean_squared_error"))
 
-df = pd.read_csv(r"board_evaluation.csv")
-X = df.iloc[:, :2].values
-y = df.iloc[:, 2].values
+df = pd.read_csv(r"agents\Group7\board_evaluation.csv")
+print(df.shape())
+
+X = df.iloc[:, 0].values
+y = df.iloc[:, 1].values
+
 
 # Split X and y to training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)

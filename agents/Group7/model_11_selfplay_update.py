@@ -22,11 +22,11 @@ def tile_to_state(tile):
     if colour == Colour.RED:
         return 1  # Assuming RED represents Player 1
     elif colour == Colour.BLUE:
-        return 2 # Assuming BLUE represents Player 2
+        return 2  # Assuming BLUE represents Player 2
     else:
         return 0  # Assuming None or another value represents an empty tile
-    
-    
+
+
 def board_to_state(board_tiles):
     return np.array([[tile_to_state(tile) for tile in row] for row in board_tiles])
 
@@ -39,11 +39,11 @@ def calculate_reward(game, agent_color):
 
 
 def choose_action(state, epsilon, model, player_num):
-    board = state.reshape(11,11)
+    board = state.reshape(11, 11)
     if np.random.rand() < epsilon:
         # Explore - choose a random action
         while True:
-            action =  np.random.randint(0, 121)
+            action = np.random.randint(0, 121)
             row, col = divmod(action, 11)
             if board[row][col] == 0:
                 return action, row, col
@@ -68,6 +68,7 @@ def choose_action(state, epsilon, model, player_num):
         else:
             return action, row, col
 
+
 # Function to update Q-values using Q-learning update rule
 def update_q_values(state, action, States, reward, done, model):
     target = reward
@@ -79,14 +80,55 @@ def update_q_values(state, action, States, reward, done, model):
     Q_values[0, action] = target
     return Q_values
 
+
 def update_q_values_illegal(state, action, reward, model):
     Q_values = model.predict(state.reshape((1, 11, 11, 1)))
     Q_values[0, action] = reward
     return Q_values
 
 
-model = keras.models.load_model("hex_agent_model.keras")
+def swap_color(x):
+    if x == 1:
+        return 2
+    elif x == 2:
+        return 1
+    return 0
 
+
+def mirror_board(states, actions):
+    states_T=[]
+    actions_T=[]
+    for move_num in range(len(states)):
+        action = actions[move_num]
+        state = states[move_num]
+        row, col = divmod(action, 11)
+        action_T = col * 11 + row
+        state_T = swap_color(state.transpose())
+        states_T.append(state_T)
+        actions_T.append(action_T)
+    return states_T, actions_T
+
+
+def update_model(states, actions, reward, model):
+    for move_num in range(len(states) - 1, -1, -1):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values(
+            states[move_num], actions[move_num], states, (0.9 ** (len(states) - move_num - 1)) * reward,
+                                                         (move_num + 1) == len(states), model)
+        # Train the model on the updated Q-values
+        model.fit(states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=3)
+    return model
+
+def update_model_illegal(states, moves, model):
+    for move_num in range(len(illegal_states)):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values_illegal(
+            states[move_num], moves[move_num], -1, model)
+        # Train the model on the updated Q-values
+        model.fit(states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=3)
+    return model
+
+model = keras.models.load_model("hex_agent_model.keras")
 
 # Training parameters
 num_episodes = 10
@@ -106,14 +148,14 @@ for episode in range(num_episodes):
         player2 = Colour.RED
         player1_num = 2
         player2_num = 1
-    
+
     start = True
     tiles = game.get_board().get_tiles()
     state = board_to_state(tiles)
     state = state.reshape((1, 11, 11, 1))
 
     total_reward = 0
-    
+
     # To store every board state during one game
     States = []
     States_eval = []
@@ -140,7 +182,7 @@ for episode in range(num_episodes):
 
             # Make move
             game.get_board().set_tile_colour(row, col, agent_color)
-            
+
             # Store the state_eval and action after player1 move
             state = board_to_state(game.get_board().get_tiles())
             state = state.reshape((1, 11, 11, 1))
@@ -172,52 +214,66 @@ for episode in range(num_episodes):
 
     # Give reward
     reward = calculate_reward(game, agent_color)
+
+    # generate mirror board according to symmetry
+    States_T, Actions_T = mirror_board(States, Actions)
+    il_state_T, il_action_T = mirror_board(illegal_states, illegal_moves)
+    States2_T, Actions2_T = mirror_board(States2, Actions2)
+    il_state2_T, il_action2_T = mirror_board(illegal_states2, illegal_moves2)
+
+    # update weights
+    update_model(States, Actions, reward, model)
+    update_model_illegal(illegal_states, illegal_moves, model)
+    update_model(States2, Actions2, -reward, model)
+    update_model_illegal(illegal_states2, illegal_moves2, model)
+    update_model(States_T, Actions_T, -reward, model)
+    update_model_illegal(il_state_T, il_action_T, model)
+    update_model(States2_T, Actions2_T, reward, model)
+    update_model_illegal(il_state2_T, il_action2_T, model)
+
     for move_num in range(len(States) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
-            States[move_num], Actions[move_num], States, (0.9**(len(States) - move_num - 1)) * reward, (move_num + 1) == len(States), model)
-        
+            States[move_num], Actions[move_num], States, (0.9 ** (len(States) - move_num - 1)) * reward,
+                                                         (move_num + 1) == len(States), model)
         # Train the model on the updated Q-values
-        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
-
-        total_reward += 0.9**(len(States) - move_num - 1) * reward
+        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states)):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values_illegal(
             illegal_states[move_num], illegal_moves[move_num], -1, model)
-        
-        # Train the model on the updated Q-values
-        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
 
-        total_reward += -1
+        # Train the model on the updated Q-values
+        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
 
     # Train the second model
     for move_num in range(len(States2) - 1, -1, -1):
         # Update Q-values using the Q-learning update rule
         Q_values2 = update_q_values(
-            States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
-        
+            States2[move_num], Actions2[move_num], States2, (0.9 ** (len(States2) - move_num - 1)) * (-reward),
+                                                            (move_num + 1) == len(States2), model)
+
         # Train the model on the updated Q-values
-        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values2, batch_size=1, epochs = 2)
+        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values2, batch_size=1, epochs=2)
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states2)):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values_illegal(
             illegal_states2[move_num], illegal_moves2[move_num], -1, model)
-        
+
         # Train the model on the updated Q-values
-        model.fit(illegal_states2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
+        model.fit(illegal_states2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
 
     # Prepare samples for evaluation model 
     board_scores = []
     for move_num in range(len(States_eval)):
         if game.get_board().get_winner() == agent_color:
-            board_scores.insert(0, 1 * (0.86**move_num))
+            board_scores.insert(0, 1 * (0.86 ** move_num))
         else:
-            board_scores.insert(0, -1 * (0.86**move_num))
+            board_scores.insert(0, -1 * (0.86 ** move_num))
 
     with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
@@ -228,16 +284,15 @@ for episode in range(num_episodes):
     board_scores = []
     for move_num in range(len(States2_eval)):
         if game.get_board().get_winner() != agent_color:
-            board_scores.insert(0, 1 * (0.86**move_num))
+            board_scores.insert(0, 1 * (0.86 ** move_num))
         else:
-            board_scores.insert(0, -1 * (0.86**move_num))
+            board_scores.insert(0, -1 * (0.86 ** move_num))
 
     with open(csv_file_path, 'a', newline='') as csv_file:
         csv_writer = csv.writer(csv_file)
         for move_num in range(len(States2_eval)):
             # Save the state and board score to the CSV file
             csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
-
 
     print(Q_values)
     print(state.reshape(11, 11))
@@ -248,12 +303,12 @@ for episode in range(num_episodes):
     # Record the winning number
     if game.get_board().get_winner() == agent_color:
         win += 1
-    
+
     print(f"Illegal moves in this round: {illegal_moves}")
     print(f"Episode: {episode + 1}, Total Reward: {total_reward}, Agent Colour: {agent_color}")
     print(f"Winner: {game.get_board().get_winner()}")
 
-print(f"Winning rate: {win/(episode+1)}")
+print(f"Winning rate: {win / (episode + 1)}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')

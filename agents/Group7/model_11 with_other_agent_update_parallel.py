@@ -7,7 +7,7 @@ import time
 import SPOILER_new
 from Game import Game
 from Colour import Colour
-from dask.distributed import Client, LocalCluster
+from dask.distributed import Client, LocalCluster, progress
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
@@ -262,11 +262,11 @@ def main(cluster, model):
     client = Client(cluster)
     futures = []
     for episode in range(num_episodes):
-        future = client.submit(play_game(model))
-        futures.append(future)
-
+        for _ in range(4):
+            future = client.submit(play_game(model))
+            futures.append(future)
+        progress(futures)
         results = client.gather(futures)
-
         client.close()
         States, Q_values = zip(*results)
         
@@ -284,5 +284,5 @@ def main(cluster, model):
 
 if __name__ == '__main__':
     model = keras.models.load_model("hex_agent_model.keras")
-    cluster = LocalCluster()
+    cluster = LocalCluster(n_workers=4)
     main(cluster, model)

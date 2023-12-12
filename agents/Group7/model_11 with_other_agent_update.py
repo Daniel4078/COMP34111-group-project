@@ -106,7 +106,7 @@ def update_q_values_illegal(state, action, reward, model):
 
 
 # Training parameters
-num_episodes = 21*4
+num_episodes = 100
 win = 0
 total_training_time = 0
 total_time = time.time()

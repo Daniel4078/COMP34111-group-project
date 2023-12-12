@@ -8,7 +8,7 @@ import SPOILER_new
 from Game import Game
 from Colour import Colour
 from dask.distributed import Client, LocalCluster, progress
-
+import dask
 # Hyperparameters
 gamma = 0.9  # Discount factor
 epsilon = 0.45  # Exploration-exploitation trade-off
@@ -67,7 +67,7 @@ def choose_action(state, epsilon, model, illegal_states, illegal_moves):
                 return action, row, col
 
     num_selection = 1
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)))[0]
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)),verbose=0)[0]
     indexes = np.argsort(Q_values)[::-1]
     while True:
         # Exploit - choose the action with the highest Q-value
@@ -88,15 +88,15 @@ def update_q_values(state, action, States, reward, done, model, move_num):
     target = reward
     if not done:
         next_state = States[move_num + 1]
-        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)))
+        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)),verbose=0)
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)),verbose=0)
     Q_values[0, action] = target
     return Q_values
 
 
 def update_q_values_illegal(state, action, reward, model):
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)))
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)),verbose=0)
     Q_values[0, action] = reward
     return Q_values
 
@@ -263,9 +263,9 @@ def main(cluster, model):
     futures = []
     for episode in range(num_episodes):
         for _ in range(4):
-            future = client.submit(play_game(model))
+            future = client.submit(play_game,model)
             futures.append(future)
-        progress(futures)
+        print(progress(futures))
         results = client.gather(futures)
         client.close()
         States, Q_values = zip(*results)

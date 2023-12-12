@@ -151,7 +151,7 @@ for episode in range(num_episodes):
 
     # enemyAgent = EnemyAgent()
     enemyAgent = SPOILER_new.MCTSAgent()
-    turn = 1
+    turn = 0
 
     # Set timeer
     startTime = time.time()
@@ -274,8 +274,9 @@ for episode in range(num_episodes):
     if game.get_board().get_winner() == agent_color:
         win += 1
 
+    print(state.reshape(11, 11))
     print(f"Illegal moves in this round: {illegal_moves}")
-    print(game.get_board().print_board())
+    # print(game.get_board().print_board())
     print(f"Episode: {episode + 1}, Total rounds: {turn}, Agent Colour: {agent_color}")
     print(f"Runing time: {run_time}, Training time: {training_time}")
     print(f"Winner: {game.get_board().get_winner()}")

@@ -5,7 +5,7 @@ import time
 training_script_path = r"model_11 with_other_agent_update.py"
 
 # 迭代次数
-num_iterations = 6*2
+num_iterations = 10
 
 # 每次迭代之间的等待时间（秒）
 wait_time = 0.1

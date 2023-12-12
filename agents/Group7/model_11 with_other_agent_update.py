@@ -10,8 +10,6 @@ import SPOILER_new
 from Game import Game
 from Colour import Colour
 
-print(keras.__version__)
-
 # Load model
 model = keras.models.load_model("hex_agent_model.keras")
 

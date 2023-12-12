@@ -1,12 +1,8 @@
 import random
-from keras import layers, models, losses
-# import tensorflow as tf
+import keras
+from keras import losses
 import numpy as np
 import csv
-
-import sys
-sys.path.append(r"D:\Programming\COMP34111-group-project\src")
-
 from Game import Game
 from Colour import Colour
 
@@ -39,7 +35,7 @@ def calculate_reward(game, agent_color):
     if game.get_board().get_winner() == agent_color:
         return 10  # Positive reward for winning
     else:
-        return -5  # Negative reward for losing
+        return -10  # Negative reward for losing
 
 
 def choose_action(state, epsilon, model, player_num):
@@ -88,41 +84,12 @@ def update_q_values_illegal(state, action, reward, model):
     Q_values[0, action] = reward
     return Q_values
 
-def create_model():
-    input_shape = (11, 11, 1)
-    input = layers.Input(shape=input_shape)
-    a = layers.Conv2D(49, (5, 5), activation='relu', padding='same')(input)
-    b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(input)
-    sub = layers.Concatenate()([a, b])
-    y = layers.BatchNormalization(epsilon=1e-5)(sub)
-    for i in range(1, 4):
-        a = layers.Conv2D(49, (5, 5), activation='relu', padding='same')(y)
-        b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(y)
-        sub = layers.Concatenate()([a, b])
-        y = layers.BatchNormalization(epsilon=1e-5)(sub)
-    for i in range(4, 8):
-        y = layers.Conv2D(130, (3, 3), activation='relu', padding='same')(y)
-        y = layers.BatchNormalization(epsilon=1e-5)(y)
-    out = layers.Dense(1, activation='sigmoid', name='q_values')(y)
-    out = layers.Reshape((121,))(out)
-    model = models.Model(inputs=input, outputs=out)
-    model.summary()
-    return model
 
-
-model = create_model()
-# Compile the model with loss
-model.compile(optimizer='adam',
-              loss=losses.MeanSquaredError(name="mean_squared_error"))
-
-model2 = create_model()
-# Compile the model with loss
-model2.compile(optimizer='adam',
-              loss=losses.MeanSquaredError(name="mean_squared_error"))
+model = keras.models.load_model("hex_agent_model.keras")
 
 
 # Training parameters
-num_episodes = 1
+num_episodes = 10
 win = 0
 csv_file_path = 'board_evaluation.csv'
 
@@ -189,7 +156,7 @@ for episode in range(num_episodes):
         States2.append(state)
 
         # Choose action
-        action2, row, col = choose_action(state, epsilon, model2, player2_num)
+        action2, row, col = choose_action(state, epsilon, model, player2_num)
         # Make move
         game.get_board().set_tile_colour(row, col, player2)
 
@@ -233,16 +200,16 @@ for episode in range(num_episodes):
             States2[move_num], Actions2[move_num], States2, (0.9**(len(States2) - move_num - 1)) * (-reward), (move_num + 1) == len(States2), model2)
         
         # Train the model on the updated Q-values
-        model2.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values2, batch_size=1, epochs = 2)
+        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values2, batch_size=1, epochs = 2)
 
     # Penalty for illegal moves
     for move_num in range(len(illegal_states2)):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values_illegal(
-            illegal_states2[move_num], illegal_moves2[move_num], -1, model2)
+            illegal_states2[move_num], illegal_moves2[move_num], -1, model)
         
         # Train the model on the updated Q-values
-        model2.fit(illegal_states2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
+        model.fit(illegal_states2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs = 2)
 
     # Prepare samples for evaluation model 
     board_scores = []
@@ -290,4 +257,3 @@ print(f"Winning rate: {win/(episode+1)}")
 
 # Save the trained model for future use
 model.save('hex_agent_model.keras')
-model2.save('hex_agent_model2.keras')

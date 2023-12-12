@@ -128,8 +128,9 @@ def write_csv(csv_file_path, States_eval, States2_eval, game, agent_color):
             # Save the state and board score to the CSV file
             csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
 
-def play_game(model):
-     # Initialization
+def play_game():
+    model = keras.models.load_model("hex_agent_model.keras")
+    # Initialization
     game = Game(board_size=11)
     agent_color = random.choice([Colour.RED, Colour.BLUE])
     # agent_color = Colour.RED
@@ -243,18 +244,12 @@ def play_game(model):
         Q_total.append(Q_values)
         
     # write_csv(csv_file_path, States_eval, States2_eval, game, agent_color)
-    
-    print(state.reshape(11, 11))
-    print(f"Illegal moves in this round: {illegal_moves}")
-    # print(game.get_board().print_board())
-    print(f"Total rounds: {turn}, Agent Colour: {agent_color}")
-    print(f"Runing time: {run_time}")
-    print(f"Winner: {game.get_board().get_winner()}")
-        
     return states_total, Q_total
 
-def main(cluster, model):
+def main(cluster):
     # Training parameters
+    global epsilon
+    model = keras.models.load_model("hex_agent_model.keras")
     num_episodes = 5
     total_training_time = 0
     total_time = time.time()
@@ -263,18 +258,21 @@ def main(cluster, model):
     futures = []
     for episode in range(num_episodes):
         for _ in range(4):
-            future = client.submit(play_game,model)
+            future = client.submit(play_game)
             futures.append(future)
         print(progress(futures))
         results = client.gather(futures)
-        client.close()
+        print(time.time()-total_time)
+        print(len(results))
         States, Q_values = zip(*results)
-        
+        print(States.shape)
+        print(Q_values.shape)
         # Decay epsilon for exploration-exploitation trade-off
         epsilon *= epsilon_decay
         epsilon = max(min_epsilon, epsilon)
-
+        print("stop")
         model.fit(States, Q_values, epochs=6)
+    client.close()
     print("")
     print(f"Total training time: {total_training_time}")
     print(f"Total time: {time.time()-total_time}")
@@ -283,6 +281,5 @@ def main(cluster, model):
 
 
 if __name__ == '__main__':
-    model = keras.models.load_model("hex_agent_model.keras")
     cluster = LocalCluster(n_workers=4)
-    main(cluster, model)
+    main(cluster)

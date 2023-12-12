@@ -1,7 +1,5 @@
 import random
 import keras
-from keras import layers, models
-import tensorflow as tf
 import numpy as np
 import csv
 from EnemyAgent import EnemyAgent
@@ -15,7 +13,7 @@ model = keras.models.load_model("hex_agent_model.keras")
 
 # Hyperparameters
 gamma = 0.9  # Discount factor
-epsilon = 0.45  # Exploration-exploitation trade-off
+epsilon = 0.35  # Exploration-exploitation trade-off
 epsilon_decay = 0.995
 min_epsilon = 0.01
 

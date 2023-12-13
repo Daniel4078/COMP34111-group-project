@@ -28,15 +28,22 @@ def create_model():
         b = layers.Conv2D(81, (3, 3), activation='relu', padding='same')(y)
         sub = layers.Concatenate()([a, b])
         y = layers.BatchNormalization(epsilon=1e-5)(sub)
+        y = layers.Dropout(0.5)(y)
     for i in range(4, 8):
         y = layers.Conv2D(130, (3, 3), activation='relu', padding='same')(y)
         y = layers.BatchNormalization(epsilon=1e-5)(y)
-    y = layers.Conv2D(130, (5, 5), activation='relu')(y)
-    y = layers.Conv2D(130, (5, 5), activation='relu')(y)
-    y = layers.Conv2D(130, (3, 3), activation='relu')(y)
+        y = layers.Dropout(0.5)(y)
+    # y = layers.Conv2D(130, (5, 5), activation='relu')(y)
+    # y = layers.Conv2D(130, (5, 5), activation='relu')(y)
+    # y = layers.Conv2D(130, (3, 3), activation='relu')(y)
+    y = layers.Flatten()(y)
+    y = layers.Dropout(0.5)(y)
+    y = layers.Dense(128, activation='relu')(y)
+    y = layers.Dense(64, activation='relu')(y)
+    y = layers.Dense(32, activation='relu')(y)
     out = layers.Dense(1, activation='tanh', name='board_score')(y)
     model = models.Model(inputs=input, outputs=out)
-    model.summary()
+    # model.summary()
     return model
 
 def create_model2():
@@ -97,6 +104,23 @@ X_test = np.array([preprocess_input(x) for x in X_test])
 # Training
 history = model.fit(X_train, y_train, epochs=20, validation_data=(X_test, y_test), batch_size=32)
 
+# batch_size = 32  
+
+# total_batches = int(np.ceil(len(X_train) / batch_size))
+
+# for episode in range(5):
+#     print(f"Eposide: {episode+1}")
+#     for i in range(total_batches):
+#         start_idx = i * batch_size
+#         end_idx = start_idx + batch_size
+
+#         x_batch = X_train[start_idx:end_idx]
+#         y_batch = y_train[start_idx:end_idx]
+
+#         history = model.train_on_batch(X_train, y_train, return_dict=True)
+
+#         print(history)
+
 # Visualize the training loss over epochs
 plt.plot(history.history['loss'], label='Training Loss')
 plt.plot(history.history['val_loss'], label='Validation Loss')
@@ -104,5 +128,7 @@ plt.xlabel('Epoch')
 plt.ylabel('Mean Squared Error')
 plt.legend()
 plt.show()
+
+# print(history)
 
 model.save('board_evaluation_model.keras')

@@ -54,10 +54,8 @@ def board_to_state(board_tiles):
 
 def calculate_reward(game, agent_color):
     if game.get_board().get_winner() == agent_color:
-        print("win!")
         return 10  # Positive reward for winning
     else:
-        print("lose")
         return -10  # Negative reward for losing
 
 
@@ -271,7 +269,6 @@ def play_game():
 
     # Give reward
     reward = calculate_reward(game, agent_color)
-    print("turn:"+ str(turn))
     States_T, Actions_T = mirror_board(States, Actions)
     il_state_T, il_action_T = mirror_board(illegal_states, illegal_moves)
     States2_T, Actions2_T = mirror_board(States2, Actions2)
@@ -289,11 +286,12 @@ def main():
     # Training parameters
     global epsilon
     model = keras.models.load_model("hex_agent_model.keras")
-    num_episodes = 100 # about 46 second of run, then about 90 seconds of train per episodes
+    num_episodes = 50 # about 46 second of run, then about 90 seconds of train per episodes
     total_training_time = 0
     total_time = time.time()
     # csv_file_path = 'board_evaluation.csv'
     for episode in range(num_episodes):
+        print("start")
         client = Client(n_workers=8)
         futures = []
         for _ in range(8):
@@ -305,11 +303,9 @@ def main():
         States, Q_values = zip(*results)
         States = np.array(States)
         Q_values = np.array(Q_values)
-
         # Decay epsilon for exploration-exploitation trade-off
         epsilon *= epsilon_decay
         epsilon = max(min_epsilon, epsilon)
-
         training_time = time.time()
         for _ in range(8):
             for i in range(len(States)):

@@ -70,7 +70,7 @@ def choose_action(state, epsilon, model, player_num):
 
 
 # Function to update Q-values using Q-learning update rule
-def update_q_values(state, action, States, reward, done, model):
+def update_q_values(state, action, States, reward, done, model, move_num):
     target = reward
     if not done:
         next_state = States[move_num + 1]
@@ -88,11 +88,18 @@ def update_q_values_illegal(state, action, reward, model):
 
 
 def swap_color(x):
-    if x == 1:
-        return 2
-    elif x == 2:
-        return 1
-    return 0
+    result = []
+    for i in range(11):
+        temp = []
+        for j in range(11):
+            if x[i,j] == 1:
+                temp.append(2)
+            elif x[i,j] == 2:
+                temp.append(1)
+            else:
+                temp.append(0)
+        result.append(temp)
+    return result
 
 
 def mirror_board(states, actions):
@@ -103,7 +110,8 @@ def mirror_board(states, actions):
         state = states[move_num]
         row, col = divmod(action, 11)
         action_T = col * 11 + row
-        state_T = swap_color(state.transpose())
+        temp = state.transpose()
+        state_T = np.array(swap_color(temp))
         states_T.append(state_T)
         actions_T.append(action_T)
     return states_T, actions_T
@@ -114,13 +122,13 @@ def update_model(states, actions, reward, model):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values(
             states[move_num], actions[move_num], states, (0.9 ** (len(states) - move_num - 1)) * reward,
-                                                         (move_num + 1) == len(states), model)
+                                                         (move_num + 1) == len(states), model, move_num)
         # Train the model on the updated Q-values
         model.fit(states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=3)
     return model
 
 def update_model_illegal(states, moves, model):
-    for move_num in range(len(illegal_states)):
+    for move_num in range(len(states)):
         # Update Q-values using the Q-learning update rule
         Q_values = update_q_values_illegal(
             states[move_num], moves[move_num], -1, model)
@@ -150,10 +158,6 @@ for episode in range(num_episodes):
         player2_num = 1
 
     start = True
-    tiles = game.get_board().get_tiles()
-    state = board_to_state(tiles)
-    state = state.reshape((1, 11, 11, 1))
-
     total_reward = 0
 
     # To store every board state during one game
@@ -175,6 +179,7 @@ for episode in range(num_episodes):
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
             # Add the state before move
+            state = board_to_state(game.get_board().get_tiles())
             States.append(state)
 
             # Choose action
@@ -195,6 +200,7 @@ for episode in range(num_episodes):
         start = False
         # Player2 
         # Add the state before move
+        state = board_to_state(game.get_board().get_tiles())
         States2.append(state)
 
         # Choose action
@@ -226,46 +232,10 @@ for episode in range(num_episodes):
     update_model_illegal(illegal_states, illegal_moves, model)
     update_model(States2, Actions2, -reward, model)
     update_model_illegal(illegal_states2, illegal_moves2, model)
-    update_model(States_T, Actions_T, -reward, model)
+    update_model(States_T, Actions_T, reward, model)
     update_model_illegal(il_state_T, il_action_T, model)
-    update_model(States2_T, Actions2_T, reward, model)
+    update_model(States2_T, Actions2_T, -reward, model)
     update_model_illegal(il_state2_T, il_action2_T, model)
-
-    for move_num in range(len(States) - 1, -1, -1):
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values(
-            States[move_num], Actions[move_num], States, (0.9 ** (len(States) - move_num - 1)) * reward,
-                                                         (move_num + 1) == len(States), model)
-        # Train the model on the updated Q-values
-        model.fit(States[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
-
-    # Penalty for illegal moves
-    for move_num in range(len(illegal_states)):
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values_illegal(
-            illegal_states[move_num], illegal_moves[move_num], -1, model)
-
-        # Train the model on the updated Q-values
-        model.fit(illegal_states[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
-
-    # Train the second model
-    for move_num in range(len(States2) - 1, -1, -1):
-        # Update Q-values using the Q-learning update rule
-        Q_values2 = update_q_values(
-            States2[move_num], Actions2[move_num], States2, (0.9 ** (len(States2) - move_num - 1)) * (-reward),
-                                                            (move_num + 1) == len(States2), model)
-
-        # Train the model on the updated Q-values
-        model.fit(States2[move_num].reshape((1, 11, 11, 1)), Q_values2, batch_size=1, epochs=2)
-
-    # Penalty for illegal moves
-    for move_num in range(len(illegal_states2)):
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values_illegal(
-            illegal_states2[move_num], illegal_moves2[move_num], -1, model)
-
-        # Train the model on the updated Q-values
-        model.fit(illegal_states2[move_num].reshape((1, 11, 11, 1)), Q_values, epochs=2)
 
     # Prepare samples for evaluation model 
     board_scores = []

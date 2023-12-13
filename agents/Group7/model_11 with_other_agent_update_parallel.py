@@ -286,18 +286,19 @@ def main(cluster):
     # Training parameters
     global epsilon
     model = keras.models.load_model("hex_agent_model.keras")
-    num_episodes = 5
+    num_episodes = 5 # 333second per episodes
     total_training_time = 0
     total_time = time.time()
     csv_file_path = 'board_evaluation.csv'
-    client = Client(cluster)
-    futures = []
     for episode in range(num_episodes):
+        client = Client(cluster)
+        futures = []
         for _ in range(8):
             future = client.submit(play_game)
             futures.append(future)
         print(progress(futures))
         results = client.gather(futures)
+        client.close()
         print("Running time:", time.time() - total_time)
         States, Q_values = zip(*results)
         States = np.array(States)
@@ -314,8 +315,6 @@ def main(cluster):
                 q_values_reshaped = Q_values[i].reshape(len(Q_values[i]), 121)
                 model.train_on_batch(states_reshaped, q_values_reshaped)
         total_training_time += time.time() - training_time
-    client.close()
-    print("")
     print(f"Total training time: {total_training_time}")
     print(f"Total time: {time.time() - total_time}")
     # Save the trained model for future use

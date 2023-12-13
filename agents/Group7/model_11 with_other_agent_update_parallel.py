@@ -11,6 +11,7 @@ from Game import Game
 from Colour import Colour
 from dask.distributed import Client, LocalCluster, progress
 import dask
+
 # Hyperparameters
 gamma = 0.9  # Discount factor
 epsilon = 0.45  # Exploration-exploitation trade-off
@@ -69,7 +70,7 @@ def choose_action(state, epsilon, model, illegal_states, illegal_moves):
                 return action, row, col
 
     num_selection = 1
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)),verbose=0)[0]
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)), verbose=0)[0]
     indexes = np.argsort(Q_values)[::-1]
     while True:
         # Exploit - choose the action with the highest Q-value
@@ -90,17 +91,68 @@ def update_q_values(state, action, States, reward, done, model, move_num):
     target = reward
     if not done:
         next_state = States[move_num + 1]
-        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)),verbose=0)
+        Q_values_next = model.predict(next_state.reshape((1, 11, 11, 1)), verbose=0)
         target += gamma * np.max(Q_values_next[0])
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)),verbose=0)
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)), verbose=0)
     Q_values[0, action] = target
     return Q_values
 
 
 def update_q_values_illegal(state, action, reward, model):
-    Q_values = model.predict(state.reshape((1, 11, 11, 1)),verbose=0)
+    Q_values = model.predict(state.reshape((1, 11, 11, 1)), verbose=0)
     Q_values[0, action] = reward
     return Q_values
+
+
+def swap_color(x):
+    result = []
+    for i in range(11):
+        temp = []
+        for j in range(11):
+            if x[i, j] == 1:
+                temp.append(2)
+            elif x[i, j] == 2:
+                temp.append(1)
+            else:
+                temp.append(0)
+        result.append(temp)
+    return result
+
+
+def mirror_board(states, actions):
+    states_T = []
+    actions_T = []
+    for move_num in range(len(states)):
+        action = actions[move_num]
+        state = states[move_num]
+        row, col = divmod(action, 11)
+        action_T = col * 11 + row
+        temp = state.transpose()
+        state_T = np.array(swap_color(temp))
+        states_T.append(state_T)
+        actions_T.append(action_T)
+    return states_T, actions_T
+
+
+def generate_Q(States, Actions, reward, model, states_total, Q_total):
+    for move_num in range(len(States) - 1, -1, -1):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values(
+            States[move_num], Actions[move_num], States, (0.9 ** (len(States) - move_num - 1)) * reward,
+                                                         (move_num + 1) == len(States), model, move_num)
+        states_total.append(States[move_num])
+        Q_total.append(Q_values)
+    return states_total, Q_total
+
+def generate_Q_il(illegal_states, illegal_moves, model, states_total, Q_total):
+    # Penalty for illegal moves
+    for move_num in range(len(illegal_states)):
+        # Update Q-values using the Q-learning update rule
+        Q_values = update_q_values_illegal(
+            illegal_states[move_num], illegal_moves[move_num], -1, model)
+        states_total.append(illegal_states[move_num])
+        Q_total.append(Q_values)
+    return states_total, Q_total
 
 def write_csv(csv_file_path, States_eval, States2_eval, game, agent_color):
     # Train the step prediction model
@@ -130,6 +182,7 @@ def write_csv(csv_file_path, States_eval, States2_eval, game, agent_color):
             # Save the state and board score to the CSV file
             csv_writer.writerow(list(States2_eval[move_num]) + [board_scores[move_num]])
 
+
 def play_game():
     model = keras.models.load_model("hex_agent_model.keras")
     # Initialization
@@ -144,7 +197,6 @@ def play_game():
     else:
         player2_color = "R"
         player2 = Colour.RED
-
 
     start = True
     tiles = game.get_board().get_tiles()
@@ -161,7 +213,7 @@ def play_game():
     States2 = []
     States2_eval = []
     Actions2 = []
-    
+
     states_total = []
     Q_total = []
     illegal_states = []
@@ -217,34 +269,18 @@ def play_game():
 
         if game.get_board().has_ended():
             break
-        
-    run_time = time.time() - startTime
+
     # Give reward
     reward = calculate_reward(game, agent_color)
-    for move_num in range(len(States) - 1, -1, -1):
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values(
-            States[move_num], Actions[move_num], States, (0.9 ** (len(States) - move_num - 1)) * reward,
-                                                         (move_num + 1) == len(States), model, move_num)
-        states_total.append(States[move_num])
-        Q_total.append(Q_values)
-
-    for move_num in range(len(States2) - 1, -1, -1):
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values(
-            States2[move_num], Actions2[move_num], States2, (0.9 ** (len(States2) - move_num - 1)) * (-reward),
-                                                            (move_num + 1) == len(States2), model, move_num)
-        states_total.append(States2[move_num])
-        Q_total.append(Q_values)
-
-    # Penalty for illegal moves
-    for move_num in range(len(illegal_states)):
-        # Update Q-values using the Q-learning update rule
-        Q_values = update_q_values_illegal(
-            illegal_states[move_num], illegal_moves[move_num], -1, model)
-        states_total.append(illegal_states[move_num])
-        Q_total.append(Q_values)
-        
+    States_T, Actions_T = mirror_board(States, Actions)
+    il_state_T, il_action_T = mirror_board(illegal_states, illegal_moves)
+    States2_T, Actions2_T = mirror_board(States2, Actions2)
+    states_total, Q_total = generate_Q(States, Actions, reward, model, states_total, Q_total)
+    states_total, Q_total = generate_Q(States2, Actions2, -reward, model, states_total, Q_total)
+    states_total, Q_total = generate_Q_il(illegal_states, illegal_moves, model, states_total, Q_total)
+    states_total, Q_total = generate_Q(States_T, Actions_T, reward, model, states_total, Q_total)
+    states_total, Q_total = generate_Q(States2_T, Actions2_T, -reward, model, states_total, Q_total)
+    states_total, Q_total = generate_Q_il(il_state_T, il_action_T, model, states_total, Q_total)
     # write_csv(csv_file_path, States_eval, States2_eval, game, agent_color)
     return states_total, Q_total
 
@@ -265,15 +301,15 @@ def main(cluster):
             futures.append(future)
         print(progress(futures))
         results = client.gather(futures)
-        print("Running time:", time.time()-total_time)
+        print("Running time:", time.time() - total_time)
         States, Q_values = zip(*results)
         States = np.array(States)
         Q_values = np.array(Q_values)
-        
+
         # Decay epsilon for exploration-exploitation trade-off
         epsilon *= epsilon_decay
         epsilon = max(min_epsilon, epsilon)
-        
+
         training_time = time.time()
         for _ in range(8):
             for i in range(len(States)):
@@ -284,7 +320,7 @@ def main(cluster):
     client.close()
     print("")
     print(f"Total training time: {total_training_time}")
-    print(f"Total time: {time.time()-total_time}")
+    print(f"Total time: {time.time() - total_time}")
     # Save the trained model for future use
     model.save('hex_agent_model.keras')
 

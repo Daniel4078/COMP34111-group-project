@@ -54,8 +54,10 @@ def board_to_state(board_tiles):
 
 def calculate_reward(game, agent_color):
     if game.get_board().get_winner() == agent_color:
+        print("win!")
         return 10  # Positive reward for winning
     else:
+        print("lose")
         return -10  # Negative reward for losing
 
 
@@ -269,6 +271,7 @@ def play_game():
 
     # Give reward
     reward = calculate_reward(game, agent_color)
+    print("turn:"+ str(turn))
     States_T, Actions_T = mirror_board(States, Actions)
     il_state_T, il_action_T = mirror_board(illegal_states, illegal_moves)
     States2_T, Actions2_T = mirror_board(States2, Actions2)
@@ -282,16 +285,16 @@ def play_game():
     return states_total, Q_total
 
 
-def main(cluster):
+def main():
     # Training parameters
     global epsilon
     model = keras.models.load_model("hex_agent_model.keras")
-    num_episodes = 5 # about 46 second of run, then about 90 seconds of train per episodes
+    num_episodes = 100 # about 46 second of run, then about 90 seconds of train per episodes
     total_training_time = 0
     total_time = time.time()
-    csv_file_path = 'board_evaluation.csv'
+    # csv_file_path = 'board_evaluation.csv'
     for episode in range(num_episodes):
-        client = Client(cluster)
+        client = Client(n_workers=8)
         futures = []
         for _ in range(8):
             future = client.submit(play_game)
@@ -314,12 +317,11 @@ def main(cluster):
                 q_values_reshaped = Q_values[i].reshape(len(Q_values[i]), 121)
                 model.train_on_batch(states_reshaped, q_values_reshaped)
         total_training_time += time.time() - training_time
+        model.save('hex_agent_model.keras')
     print(f"Total training time: {total_training_time}")
     print(f"Total time: {time.time() - total_time}")
     # Save the trained model for future use
-    model.save('hex_agent_model.keras')
 
 
 if __name__ == '__main__':
-    cluster = LocalCluster(n_workers=8)
-    main(cluster)
+    main()

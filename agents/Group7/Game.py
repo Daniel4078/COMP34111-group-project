@@ -33,7 +33,7 @@ class Game():
             "run string": "python3 agents/NaiveAgent.py"
         },
         verbose=False,
-        log=True,
+        log=False,
         print_protocol=False,
         kill_bots=True,
         silent_bots=True

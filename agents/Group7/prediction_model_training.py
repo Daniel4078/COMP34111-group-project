@@ -57,7 +57,7 @@ model.compile(optimizer='adam',
               loss=losses.MeanSquaredError(name="mean_squared_error"))
 
 df = pd.read_csv(r"agents\Group7\board_evaluation.csv")
-print(df.shape())
+print(df.shape)
 
 X = df.iloc[:, 0].values
 y = df.iloc[:, 1].values

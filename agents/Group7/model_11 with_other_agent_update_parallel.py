@@ -260,7 +260,7 @@ def main(cluster):
     client = Client(cluster)
     futures = []
     for episode in range(num_episodes):
-        for _ in range(4):
+        for _ in range(8):
             future = client.submit(play_game)
             futures.append(future)
         print(progress(futures))
@@ -275,7 +275,7 @@ def main(cluster):
         epsilon = max(min_epsilon, epsilon)
         
         training_time = time.time()
-        for _ in range(3):
+        for _ in range(8):
             for i in range(len(States)):
                 states_reshaped = States[i].reshape(len(States[i]), 11, 11, 1)
                 q_values_reshaped = Q_values[i].reshape(len(Q_values[i]), 121)
@@ -290,5 +290,5 @@ def main(cluster):
 
 
 if __name__ == '__main__':
-    cluster = LocalCluster(n_workers=4)
+    cluster = LocalCluster(n_workers=8)
     main(cluster)

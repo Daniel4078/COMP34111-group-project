@@ -199,11 +199,6 @@ def play_game():
         player2 = Colour.RED
 
     start = True
-    tiles = game.get_board().get_tiles()
-    state = board_to_state(tiles)
-    state = state.reshape((1, 11, 11, 1))
-
-    total_reward = 0
 
     # To store every board state during one game
     States = []
@@ -229,6 +224,7 @@ def play_game():
         # Let Red starts first
         if agent_color == Colour.RED or start == False:
             # Add the state before move
+            state = board_to_state(game.get_board().get_tiles())
             States.append(state)
 
             # Choose action
@@ -250,6 +246,7 @@ def play_game():
         start = False
         # Player2 
         # Add the state before move
+        state = board_to_state(game.get_board().get_tiles())
         States2.append(state)
 
         # action2 = enemyAgent.run(player2_color, state_str, turn)

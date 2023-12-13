@@ -286,7 +286,7 @@ def main(cluster):
     # Training parameters
     global epsilon
     model = keras.models.load_model("hex_agent_model.keras")
-    num_episodes = 5 # 333second per episodes
+    num_episodes = 5 # about 46 second of run, then about 90 seconds of train per episodes
     total_training_time = 0
     total_time = time.time()
     csv_file_path = 'board_evaluation.csv'
@@ -296,7 +296,6 @@ def main(cluster):
         for _ in range(8):
             future = client.submit(play_game)
             futures.append(future)
-        print(progress(futures))
         results = client.gather(futures)
         client.close()
         print("Running time:", time.time() - total_time)

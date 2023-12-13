@@ -310,7 +310,7 @@ def main():
         for i in range(len(States)):
             states_reshaped = States[i].reshape(len(States[i]), 11, 11, 1)
             q_values_reshaped = Q_values[i].reshape(len(Q_values[i]), 121)
-            model.fit(states_reshaped, q_values_reshaped, epochs=10, verbose=2)
+            model.fit(states_reshaped, q_values_reshaped, epochs=30, verbose=2)
         total_training_time += time.time() - training_time
         model.save('hex_agent_model.keras')
     print(f"Total training time: {total_training_time}")

@@ -4,6 +4,8 @@ import numpy as np
 import csv
 # from EnemyAgent import EnemyAgent
 import time
+
+import tensorflow as tf
 import SPOILER_new
 from Game import Game
 from Colour import Colour
@@ -246,6 +248,7 @@ def play_game():
     # write_csv(csv_file_path, States_eval, States2_eval, game, agent_color)
     return states_total, Q_total
 
+
 def main(cluster):
     # Training parameters
     global epsilon
@@ -262,16 +265,22 @@ def main(cluster):
             futures.append(future)
         print(progress(futures))
         results = client.gather(futures)
-        print(time.time()-total_time)
-        print(len(results))
+        print("Running time:", time.time()-total_time)
         States, Q_values = zip(*results)
-        print(States.shape)
-        print(Q_values.shape)
+        States = np.array(States)
+        Q_values = np.array(Q_values)
+        
         # Decay epsilon for exploration-exploitation trade-off
         epsilon *= epsilon_decay
         epsilon = max(min_epsilon, epsilon)
-        print("stop")
-        model.fit(States, Q_values, epochs=6)
+        
+        training_time = time.time()
+        for _ in range(3):
+            for i in range(len(States)):
+                states_reshaped = States[i].reshape(len(States[i]), 11, 11, 1)
+                q_values_reshaped = Q_values[i].reshape(len(Q_values[i]), 121)
+                model.train_on_batch(states_reshaped, q_values_reshaped)
+        total_training_time += time.time() - training_time
     client.close()
     print("")
     print(f"Total training time: {total_training_time}")

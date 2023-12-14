@@ -3,9 +3,76 @@ import random
 import numpy as np
 from Board import Board
 from Colour import Colour
-from copy import deepcopy
-from math import sqrt, log
-from time import time as clock
+import torch
+import torch.nn as nn
+
+class SkipLayerBias(nn.Module):
+
+    def __init__(self, channels, reach, scale=1):
+        super(SkipLayerBias, self).__init__()
+        self.conv = nn.Conv2d(channels, channels, kernel_size=reach*2+1, padding=reach, bias=False)
+        self.bn = nn.BatchNorm2d(channels)
+        self.scale = scale
+
+    def forward(self, x):
+        return self.swish(x + self.scale*self.bn(self.conv(x)))
+    
+    def swish(self, x):
+        return x * torch.sigmoid(x)
+
+
+class Conv(nn.Module):
+    def __init__(self, board_size, layers, intermediate_channels, reach, export_mode):
+        super(Conv, self).__init__()
+        self.board_size = board_size
+        self.conv = nn.Conv2d(2, intermediate_channels, kernel_size=2*reach+1, padding=reach-1)
+        self.skiplayers = nn.ModuleList([SkipLayerBias(intermediate_channels, 1) for idx in range(layers)])
+        self.policyconv = nn.Conv2d(intermediate_channels, 1, kernel_size=2*reach+1, padding=reach, bias=False)
+        self.bias = nn.Parameter(torch.zeros(board_size**2))
+        self.export_mode = export_mode
+
+    def forward(self, x):
+        x_sum = torch.sum(x[:, :, 1:-1, 1:-1], dim=1).view(-1,self.board_size**2)
+        x = self.conv(x)
+        for skiplayer in self.skiplayers:
+            x = skiplayer(x)
+        if self.export_mode:
+            return self.policyconv(x).view(-1, self.board_size ** 2) + self.bias
+        #  illegal moves are given a huge negative bias, so they are never selected for play
+        illegal = x_sum * torch.exp(torch.tanh((x_sum.sum(dim=1)-1)*1000)*10).unsqueeze(1).expand_as(x_sum) - x_sum
+        return self.policyconv(x).view(-1, self.board_size**2) + self.bias - illegal
+    
+class NoSwitchWrapperModel(nn.Module):
+    def __init__(self, model):
+        super(NoSwitchWrapperModel, self).__init__()
+        self.board_size = model.board_size
+        self.internal_model = model
+
+    def forward(self, x):
+        illegal = 1000*torch.sum(x[:, :, 1:-1, 1:-1], dim=1).view(-1,self.board_size**2)
+        return self.internal_model(x)-illegal
+
+
+class RotationWrapperModel(nn.Module):
+    def __init__(self, model, export_mode):
+        super(RotationWrapperModel, self).__init__()
+        self.board_size = model.board_size
+        self.internal_model = model
+        self.export_mode = export_mode
+
+    def forward(self, x):
+        if self.export_mode:
+            return self.internal_model(x)
+        print(x.shape)
+
+        x_flip = torch.flip(x, [2, 3])
+        y_flip = self.internal_model(x_flip)
+        y = torch.flip(y_flip, [1])
+        return (self.internal_model(x) + y)/2
+
+
+with torch.no_grad():
+    outputs_tensor = model(current_boards_tensor)
 
 class Ouragent():
     HOST = "127.0.0.1"
@@ -23,7 +90,39 @@ class Ouragent():
         self.turn_count = 0
         self.last_move = None
         self.neighbor_patterns = ((-1,0), (0,-1), (-1,1), (0,1), (1,0), (1,-1))
-        self.model = MCTSAgent()
+        self.model = self.load_model('11_2w4_2000.pt')
+
+
+
+    def load_model(model_file, export_mode=False):
+        checkpoint = torch.load(model_file, map_location="cpu")
+        model = create_model(checkpoint['config'], export_mode)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()
+        torch.no_grad()
+        return model
+
+    def create_model(config, export_mode=False):
+        board_size = config.getint('board_size')
+        switch_model = config.getboolean('switch_model')
+        rotation_model = config.getboolean('rotation_model')
+
+        model = Conv(
+            board_size=board_size,
+            layers=config.getint('layers'),
+            intermediate_channels=config.getint('intermediate_channels'),
+            reach=config.getint('reach'),
+            export_mode=export_mode
+            )
+
+        if not switch_model:
+            model = NoSwitchWrapperModel(model)
+
+        if rotation_model:
+            model = RotationWrapperModel(model, export_mode)
+
+        return model
+
 
 
     def run(self):
@@ -147,15 +246,6 @@ class Ouragent():
     
     
     def resistance(self, state, empty, color):
-        """
-        Output a resistance heuristic score over all empty nodes:
-            -Treat the west edge connected nodes as one source node with voltage 1
-            -Treat east edge connected nodes as one destination node with voltage 0
-            -Treat edges between empty nodes, or from source/dest to an empty node as resistors with conductance 1
-            -Treat edges to blue nodes (except source and dest) as perfect conductors 左右
-            -Treat edges to red nodes as perfect resistors 上下
-        """
-        
         if self.board.has_ended():
             if  self.board.get_winner() == color:
                 return float("inf")
@@ -241,7 +331,7 @@ class Ouragent():
         if maximizing_player:
             max_eval = float('-inf')
             best_move = None
-            for move in self.model.get_moves(board, self.colour):
+            for move in self.pick_moves(board, self.colour):
                 newboard= self.make_move_copy(board, move, self.colour)
                 eval, _ = self.minimax(newboard, depth - 1, False, alpha, beta)
                 if eval > max_eval:
@@ -254,7 +344,7 @@ class Ouragent():
         else:
             min_eval = float('inf')
             best_move = None
-            for move in self.model.get_moves(board, self.opp_colour()):
+            for move in self.pick_moves(board, self.opp_colour()):
                 newboard= self.make_move_copy(board, move, self.opp_colour())
                 eval, _ = self.minimax(newboard, depth - 1, True, alpha, beta)
                 if eval < min_eval:
@@ -274,6 +364,24 @@ class Ouragent():
             c = self.opp_colour()
             return -self.resistance(temp, self.get_empty(temp), c)
  
+    def pick_moves(self, board, colour):
+        state = self.board_to_state(board)
+        sp_state1 = np.zeros((self.board_size, self.board_size))
+        sp_state2 = np.zeros((self.board_size, self.board_size))
+        np.place(sp_state1, state==2, 1)
+        np.place(sp_state2, state==1, 1)
+        boards = torch.tensor([np.pad(sp_state1, 1, constant_values=1),np.pad(sp_state2, 1, constant_values=1)], dtype=torch.float)
+        current_boards_tensor = boards.unsqueeze(0)
+        with torch.no_grad():
+            outputs_tensor = self.model(current_boards_tensor)
+        Q_values = np.array(outputs_tensor)[0]
+        indexes = np.argsort(Q_values)[::-1]
+        temp = []
+        for index in indexes[:4]:
+            x,y = divmod(index, 11)
+            temp.append([x, y])
+        return temp
+
 
     def opp_colour(self):
         if self.colour == "R":
@@ -282,155 +390,6 @@ class Ouragent():
             return "R"
         else:
             return "None"
-
-class Node:
-    def __init__(self, move: tuple = None, parent: object = None, colour=None, moves=None):
-        self.move = move
-        self.parent = parent
-        self.moves = moves
-        self.colour = colour
-        self.N = 0  # times this position was visited
-        self.Q = 0  # average reward (wins-losses) from this position
-        self.Q_RAVE = 0
-        self.N_RAVE = 0
-        self.children = {}
-        self.outcome = None
-
-    def add_children(self, children: dict) -> None:
-        for child in children:
-            self.children[child.move] = child
-
-    @property
-    def value(self, explore = 0.5, rave_const = 300):
-        if self.N == 0:
-            return 0 if explore == 0 else float('inf')
-        else:
-            alpha = max(0, (rave_const - self.N) / rave_const)
-            UCT = self.Q / self.N + explore * sqrt(2 * log(self.parent.N) / self.N)
-            AMAF = self.Q_RAVE / self.N_RAVE if self.N_RAVE != 0 else 0
-            return (1 - alpha) * UCT + alpha * AMAF
-
-
-class MCTSAgent:
-    def __init__(self, board_size=11):
-        self.board_size = board_size
-        self.choices = []
-        self.board = Board(board_size)
-        self.colour = None
-        self.run_time = 3
-        self.node_count = 0  # keep track of the total number of nodes in the search tree that have been created and explored
-        self.ifFirstStep = True
-        self.root = Node()
-
-    def get_moves(self, board, color):
-        self.colour = Colour.from_char(color)
-        self.board = board
-        temp = []
-        for i in range(self.board_size):
-            for j in range(self.board_size):
-                if Colour.get_char(self.board.get_tiles()[i][j].get_colour()) == "0":
-                    temp.append((i, j))
-        self.choices = temp
-        return self.search()
-
-    # SEARCH
-    def search(self) -> None:
-        end_time = clock() + self.run_time
-        self.root = Node(move=None, parent=None, colour=self.colour, moves=self.choices)
-        while clock() < end_time:
-            selected_node, updated_board = self.select_node()
-            turn = Colour.opposite(selected_node.colour)
-            outcome, red_rave_pts, blue_rave_pts = self.roll_out(selected_node, updated_board, turn)
-            self.backup(selected_node, turn, outcome, red_rave_pts, blue_rave_pts)
-
-        best_move = self.best_move()
-        return list(best_move)
-
-    def select_node(self) -> tuple:
-        node = self.root
-        state = deepcopy(self.board)
-
-        while node.children:
-            max_value = max(node.children.values(), key=lambda n: n.value).value
-            max_nodes = [n for n in node.children.values() if n.value == max_value]
-            node = random.choice(max_nodes)
-            state.set_tile_colour(node.move[0], node.move[1], node.colour)
-            if node.N == 0:
-                return node, state
-
-        if self.expand(node, node.moves, node.colour):
-            node = random.choice(list(node.children.values()))
-            state.set_tile_colour(node.move[0], node.move[1], node.colour)
-
-        return node, state
-
-    @staticmethod
-    def expand(parent: Node, moves, colour) -> bool:
-        children = []
-
-        for move in moves:
-            updated_moves = moves.copy()
-            updated_moves.remove(move)
-            child_colour = Colour.opposite(colour) if parent.N > 0 else colour
-            children.append(Node(move, parent, child_colour, updated_moves))
-
-        parent.add_children(children)
-
-        return True
-
-    @staticmethod
-    def roll_out(node: Node, state: Board, turn) -> tuple:
-        moves = node.moves.copy()
-
-        while not state.has_ended():
-            move = random.choice(moves)
-            state.set_tile_colour(move[0], move[1], turn)
-            moves.remove(move)
-            turn = Colour.opposite(turn)
-
-        red_rave_pts = []
-        blue_rave_pts = []
-
-        board_str = state.print_board(bnf=True)
-        rows = board_str.split(',')
-        for i, row in enumerate(rows):
-            for j, cell in enumerate(row):
-                if cell == 'R':
-                    red_rave_pts.append((i, j))
-                elif cell == 'B':
-                    blue_rave_pts.append((i, j))
-
-        return state.get_winner(), red_rave_pts, blue_rave_pts
-
-    def backup(self, node: Node, turn: int, outcome: int, red_rave_pts: list, blue_rave_pts: list) -> None:
-
-        reward = -1 if outcome == turn else 1
-
-        while node is not None:
-            if turn == Colour.BLUE:
-                for point in blue_rave_pts:
-                    if point in node.children:
-                        node.children[point].Q_RAVE += -reward
-                        node.children[point].N_RAVE += 1
-            else:
-                for point in red_rave_pts:
-                    if point in node.children:
-                        node.children[point].Q_RAVE += -reward
-                        node.children[point].N_RAVE += 1
-
-            node.N += 1
-            node.Q += reward
-
-            turn = Colour.BLUE if turn == Colour.RED else Colour.RED
-            reward = -reward
-            node = node.parent
-
-    def best_move(self):
-        sorted_children = sorted(self.root.children.values(), key=lambda n: n.N, reverse=True)
-        top_moves = sorted_children[:3]
-        top_moves = [node.move for node in top_moves]
-        return top_moves
-
 
 if (__name__ == "__main__"):
     agent = Ouragent()

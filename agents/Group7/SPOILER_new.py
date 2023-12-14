@@ -54,7 +54,7 @@ class MCTSAgent:
         self.ifFirstStep = True
         self.root = Node()
 
-    def play_out(self, board, color):
+    def get_moves(self, board, color):
         self.colour = Colour.from_char(color)
         self.board = board
         temp = []
@@ -158,7 +158,8 @@ class MCTSAgent:
             node = node.parent
 
     def best_move(self):
-        max_value = max(self.root.children.values(), key=lambda n: n.N).N
-        max_nodes = [n for n in self.root.children.values() if n.N == max_value]
-        bestchild = random.choice(max_nodes)
-        return bestchild.move
+        sorted_children = sorted(self.root.children.values(), key=lambda n: n.N, reverse=True)
+        top_four_moves = sorted_children[:4]
+        top_four_moves = [node.move for node in top_four_moves]
+
+        return top_four_moves

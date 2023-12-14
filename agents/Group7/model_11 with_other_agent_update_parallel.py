@@ -64,7 +64,7 @@ def choose_action(state, epsilon, model, illegal_states, illegal_moves):
     if np.random.rand() < epsilon:
         # Explore - choose a random action
         while True:
-            action = np.random.randint(0, 121)
+            action = np.random.randint(0, 120)
             row, col = divmod(action, 11)
             if board[row][col] == 0:
                 return action, row, col
@@ -286,12 +286,12 @@ def main():
     # Training parameters
     global epsilon
     model = keras.models.load_model("hex_agent_model.keras")
-    model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
-    filepath="hex_agent_model.keras",
-    monitor='val_loss',
-    verbose=1,
-    mode='min',
-    save_best_only=True)
+    # model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+    # filepath="hex_agent_model.keras",
+    # monitor='val_loss',
+    # verbose=1,
+    # mode='min',
+    # save_best_only=True)
     num_episodes = 50 # about 46 second of run, then about 90 seconds of train per episodes
     total_training_time = 0
     total_time = time.time()
@@ -314,15 +314,16 @@ def main():
         epsilon = max(min_epsilon, epsilon)
         training_time = time.time()
         for i in range(len(States)):
-            states_reshaped = States[i].reshape(len(States[i]), 11, 11, 1)
-            print(len(States[i]))
-            q_values_reshaped = Q_values[i].reshape(len(Q_values[i]), 121)
-            model.fit(states_reshaped, q_values_reshaped, epochs=20, verbose=2, callbacks=[model_checkpoint_callback],validation_split=0.2)
+            length = len(States[i])
+            print(length)
+            states_reshaped = States[i].reshape(length, 11, 11, 1)
+            q_values_reshaped = Q_values[i].reshape(length, 121)
+            model.fit(states_reshaped, q_values_reshaped, epochs=20, verbose=2)
         total_training_time += time.time() - training_time
+        model.save('hex_agent_model.keras')
     print(f"Total training time: {total_training_time}")
     print(f"Total time: {time.time() - total_time}")
     # Save the trained model for future use
-    model.save('hex_agent_model_final.keras')
 
 
 if __name__ == '__main__':

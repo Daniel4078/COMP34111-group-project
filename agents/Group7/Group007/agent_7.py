@@ -91,8 +91,6 @@ class Ouragent():
         self.colour = ""
         self.player_num = 0
         self.turn_count = 0
-        self.current = 0
-        self.maxcurrent = 0
         self.last_move = None
         self.neighbor_patterns = (
             (-1, 0), (0, -1), (-1, 1), (0, 1), (1, 0), (1, -1))
@@ -171,15 +169,11 @@ class Ouragent():
     def swap_map(self):
         x = self.last_move[0]
         y = self.last_move[1]
-        if 1 < x < 9 and 0 < y < 10:
-            return True
-        if x == 9 and (y == 0 or y == 1):
-            return True
-        if x == 1 and (y == 9 or y == 10):
-            return True
-        if (x == 10 and y == 0) or (x == 0 and y == 10):
-            return True
-        return False
+        if x == 0 and y < 10:
+            return False
+        if x == 10 and 0 < y:
+            return False
+        return True
 
     def tile_to_state(self, tile):
         colour = tile.get_colour()
@@ -316,14 +310,17 @@ class Ouragent():
             self.last_move = pos
             self.turn_count += 1
             return
+        if self.colour == "B" and self.turn_count == 1:
+            if self.board_to_state(self.board.get_tiles())[self.board_size // 2][self.board_size // 2] == 0:
+                pos = [self.board_size // 2, self.board_size // 2]
+                self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
+                self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
+                self.last_move = pos
+                self.turn_count += 1
+                return
         _, pos = self.minimax(self.board, 1, True, float('-inf'), float('inf'))
-        self.current = self.evaluate_board(
-            self.board_to_state(self.board.get_tiles()), True)
-        self.maxcurrent = max(self.current, self.maxcurrent)
-        print(self.maxcurrent)
         self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
-        self.board.set_tile_colour(
-            pos[0], pos[1], Colour.from_char(self.colour))
+        self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
         self.last_move = pos
         self.turn_count += 1
 

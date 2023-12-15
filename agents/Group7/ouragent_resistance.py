@@ -63,16 +63,11 @@ class RotationWrapperModel(nn.Module):
     def forward(self, x):
         if self.export_mode:
             return self.internal_model(x)
-        print(x.shape)
-
         x_flip = torch.flip(x, [2, 3])
         y_flip = self.internal_model(x_flip)
         y = torch.flip(y_flip, [1])
         return (self.internal_model(x) + y)/2
 
-
-with torch.no_grad():
-    outputs_tensor = model(current_boards_tensor)
 
 class Ouragent():
     HOST = "127.0.0.1"
@@ -88,21 +83,23 @@ class Ouragent():
         self.colour = ""
         self.player_num = 0
         self.turn_count = 0
+        self.current = 0
+        self.maxcurrent = 0
         self.last_move = None
         self.neighbor_patterns = ((-1,0), (0,-1), (-1,1), (0,1), (1,0), (1,-1))
         self.model = self.load_model('11_2w4_2000.pt')
 
 
 
-    def load_model(model_file, export_mode=False):
+    def load_model(self, model_file, export_mode=False):
         checkpoint = torch.load(model_file, map_location="cpu")
-        model = create_model(checkpoint['config'], export_mode)
+        model = self.create_model(checkpoint['config'], export_mode)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
         torch.no_grad()
         return model
 
-    def create_model(config, export_mode=False):
+    def create_model(self, config, export_mode=False):
         board_size = config.getint('board_size')
         switch_model = config.getboolean('switch_model')
         rotation_model = config.getboolean('rotation_model')
@@ -208,9 +205,6 @@ class Ouragent():
         return np.array([np.pad(sp_state1, 2, constant_values=1),np.pad(sp_state2, 2, constant_values=1)])
 
     def neighbors(self, cell):
-        """
-        Return list of neighbors of the passed cell.
-        """
         x = cell[0]
         y = cell[1]
         return [(n[0] + x , n[1] + y) for n in self.neighbor_patterns\
@@ -248,10 +242,9 @@ class Ouragent():
     def resistance(self, state, empty, color):
         if self.board.has_ended():
             if  self.board.get_winner() == color:
-                return float("inf")
+                return np.zeros((self.board_size+4, self.board_size+4)), float("inf")
             else:
-                return 0
-            
+                return np.zeros((self.board_size+4, self.board_size+4)), 0
         index_to_location = empty
         num_empty = len(empty)
         location_to_index = {index_to_location[i]:i for i in range(num_empty)}
@@ -285,17 +278,20 @@ class Ouragent():
             V = np.linalg.solve(G,I)
         except np.linalg.linalg.LinAlgError:
             V = np.linalg.lstsq(G,I)[0]
-        V_board = np.zeros((self.board_size+4, self.board_size+4))
-        for i in range(num_empty):
-            V_board[index_to_location[i]] = V[i]
         C = 0
+        Il = np.zeros((self.board_size+4, self.board_size+4))
         for i in range(num_empty):
+            if index_to_location[i] in source_connected:
+                Il[index_to_location[i]] += abs(V[i] - 1)/2
+            if index_to_location[i] in dest_connected:
+                Il[index_to_location[i]] += abs(V[i])/2
             for j in range(num_empty):
                 if(i!=j and G[i,j] != 0):
+                    Il[index_to_location[i]] += abs(G[i,j]*(V[i] - V[j]))/2
                     if(index_to_location[i] in source_connected and
                     index_to_location[j] not in source_connected):
                         C+=-G[i,j]*(V[i] - V[j])
-        return C
+        return Il,C
 
     def make_move(self):
         if self.colour == "B" and self.turn_count == 0:
@@ -313,7 +309,10 @@ class Ouragent():
             self.last_move = pos
             self.turn_count += 1
             return
-        _, pos = self.minimax(self.board, 3, True, float('-inf'), float('inf'))
+        _, pos = self.minimax(self.board, 1, True, float('-inf'), float('inf'))
+        self.current = self.evaluate_board(self.board_to_state(self.board.get_tiles()),True)
+        self.maxcurrent = max(self.current, self.maxcurrent)
+        print(self.maxcurrent)
         self.s.sendall(bytes(f"{pos[0]},{pos[1]}\n", "utf-8"))
         self.board.set_tile_colour(pos[0], pos[1], Colour.from_char(self.colour))
         self.last_move = pos
@@ -359,17 +358,55 @@ class Ouragent():
         temp = self.get_sp_state(tiles)
         if maximizing_player:
             c = self.colour
-            return self.resistance(temp, self.get_empty(temp), c)
+            _, s = self.resistance(temp, self.get_empty(temp), c)
+            return s
         else:
             c = self.opp_colour()
-            return -self.resistance(temp, self.get_empty(temp), c)
+            _, s = self.resistance(temp, self.get_empty(temp), c)
+            return -s
  
+    def pick_moves_sp(self, board, colour):
+        # state = self.board_to_state(board.get_tiles())
+        # temp = self.get_sp_state(state)
+        # Q_values = self.score(temp, colour).flatten()
+        # indexes = np.argsort(Q_values)[::-1]
+        # temp = []
+        # num_selection = 0
+        # count = 0
+        # while count < 4:
+        #     action = indexes[num_selection]
+        #     row, col = divmod(action, 11)
+        #     if state[row][col] != 0:
+        #         num_selection += 1
+        #     else:
+        #         temp.append([row, col])
+        #         num_selection += 1
+        #         count += 1
+        return temp
+    
     def pick_moves(self, board, colour):
-        state = self.board_to_state(board)
+        # state = self.board_to_state(board.get_tiles())
+        # temp = self.get_sp_state(state)
+        # Q_values = self.score(temp, colour).flatten()
+        # indexes = np.argsort(Q_values)[::-1]
+        # temp = []
+        # num_selection = 0
+        # count = 0
+        # while count < 4:
+        #     action = indexes[num_selection]
+        #     row, col = divmod(action, 11)
+        #     if state[row][col] != 0:
+        #         num_selection += 1
+        #     else:
+        #         temp.append([row, col])
+        #         num_selection += 1
+        #         count += 1
+        # return temp
+        state = self.board_to_state(board.get_tiles())
         sp_state1 = np.zeros((self.board_size, self.board_size))
         sp_state2 = np.zeros((self.board_size, self.board_size))
-        np.place(sp_state1, state==2, 1)
-        np.place(sp_state2, state==1, 1)
+        np.place(sp_state1, state==1, 1)
+        np.place(sp_state2, state==2, 1)
         boards = torch.tensor([np.pad(sp_state1, 1, constant_values=1),np.pad(sp_state2, 1, constant_values=1)], dtype=torch.float)
         current_boards_tensor = boards.unsqueeze(0)
         with torch.no_grad():
@@ -377,10 +414,31 @@ class Ouragent():
         Q_values = np.array(outputs_tensor)[0]
         indexes = np.argsort(Q_values)[::-1]
         temp = []
-        for index in indexes[:4]:
+        for index in indexes[:1]:
             x,y = divmod(index, 11)
             temp.append([x, y])
         return temp
+
+    # def score(self, state, color):
+    #     Q = {}
+    #     empty = self.get_empty(state)
+    #     I1, C1 = self.resistance(state, empty, color)
+    #     if color == "R":
+    #         other_color = "B"
+    #     elif color == "B":
+    #         other_color = "R"
+    #     I2, C2 = self.resistance(state, empty, other_color)
+    #     for cell in empty:
+    #         C1_prime = C1 + I1[cell]**2/(3*(1-I1[cell]))
+    #         C2_prime = max(1,C2 - I2[cell])
+    #         if(C1_prime>C2_prime):
+    #             Q[cell] = min(1,max(-1,1 - C2_prime/C1_prime))
+    #         else:
+    #             Q[cell] = min(1,max(-1,C1_prime/C2_prime - 1))
+    #     output = -1*np.ones((self.board_size, self.board_size))
+    #     for cell, value in Q.items():
+    #         output[cell[0]-2, cell[1]-2] = value
+    #     return output
 
 
     def opp_colour(self):

@@ -3,6 +3,7 @@ import random
 import numpy as np
 from Board import Board
 from Colour import Colour
+from pathlib import Path
 import torch
 import torch.nn as nn
 
@@ -94,7 +95,9 @@ class Ouragent():
         self.last_move = None
         self.neighbor_patterns = (
             (-1, 0), (0, -1), (-1, 1), (0, 1), (1, 0), (1, -1))
-        self.model = self.load_model('agents/Group007/1111.pt')
+        root_dir = Path(__file__).resolve().parent
+        print(str(root_dir))
+        self.model = self.load_model(str(root_dir)+r'/1111.pt')
 
     def load_model(self, model_file, export_mode=False):
         checkpoint = torch.load(model_file, map_location="cpu")

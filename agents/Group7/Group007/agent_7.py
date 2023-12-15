@@ -94,7 +94,7 @@ class Ouragent():
         self.last_move = None
         self.neighbor_patterns = (
             (-1, 0), (0, -1), (-1, 1), (0, 1), (1, 0), (1, -1))
-        self.model = self.load_model('1111.pt')
+        self.model = self.load_model('agents/Group007/1111.pt')
 
     def load_model(self, model_file, export_mode=False):
         checkpoint = torch.load(model_file, map_location="cpu")

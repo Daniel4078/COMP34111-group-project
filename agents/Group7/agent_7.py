@@ -12,12 +12,12 @@ class SkipLayerBias(nn.Module):
     def __init__(self, channels, reach, scale=1):
         super(SkipLayerBias, self).__init__()
         self.conv = nn.Conv2d(channels, channels,
-                              kernel_size=reach*2+1, padding=reach, bias=False)
+                              kernel_size=reach * 2 + 1, padding=reach, bias=False)
         self.bn = nn.BatchNorm2d(channels)
         self.scale = scale
 
     def forward(self, x):
-        return self.swish(x + self.scale*self.bn(self.conv(x)))
+        return self.swish(x + self.scale * self.bn(self.conv(x)))
 
     def swish(self, x):
         return x * torch.sigmoid(x)
@@ -28,25 +28,25 @@ class Conv(nn.Module):
         super(Conv, self).__init__()
         self.board_size = board_size
         self.conv = nn.Conv2d(2, intermediate_channels,
-                              kernel_size=2*reach+1, padding=reach-1)
+                              kernel_size=2 * reach + 1, padding=reach - 1)
         self.skiplayers = nn.ModuleList(
             [SkipLayerBias(intermediate_channels, 1) for idx in range(layers)])
         self.policyconv = nn.Conv2d(
-            intermediate_channels, 1, kernel_size=2*reach+1, padding=reach, bias=False)
-        self.bias = nn.Parameter(torch.zeros(board_size**2))
+            intermediate_channels, 1, kernel_size=2 * reach + 1, padding=reach, bias=False)
+        self.bias = nn.Parameter(torch.zeros(board_size ** 2))
         self.export_mode = export_mode
 
     def forward(self, x):
         x_sum = torch.sum(x[:, :, 1:-1, 1:-1],
-                          dim=1).view(-1, self.board_size**2)
+                          dim=1).view(-1, self.board_size ** 2)
         x = self.conv(x)
         for skiplayer in self.skiplayers:
             x = skiplayer(x)
         if self.export_mode:
             return self.policyconv(x).view(-1, self.board_size ** 2) + self.bias
-        illegal = x_sum * torch.exp(torch.tanh((x_sum.sum(dim=1)-1)*1000)
+        illegal = x_sum * torch.exp(torch.tanh((x_sum.sum(dim=1) - 1) * 1000)
                                     * 10).unsqueeze(1).expand_as(x_sum) - x_sum
-        return self.policyconv(x).view(-1, self.board_size**2) + self.bias - illegal
+        return self.policyconv(x).view(-1, self.board_size ** 2) + self.bias - illegal
 
 
 class NoSwitchWrapperModel(nn.Module):
@@ -56,9 +56,9 @@ class NoSwitchWrapperModel(nn.Module):
         self.internal_model = model
 
     def forward(self, x):
-        illegal = 1000*torch.sum(x[:, :, 1:-1, 1:-1],
-                                 dim=1).view(-1, self.board_size**2)
-        return self.internal_model(x)-illegal
+        illegal = 1000 * torch.sum(x[:, :, 1:-1, 1:-1],
+                                   dim=1).view(-1, self.board_size ** 2)
+        return self.internal_model(x) - illegal
 
 
 class RotationWrapperModel(nn.Module):
@@ -74,7 +74,7 @@ class RotationWrapperModel(nn.Module):
         x_flip = torch.flip(x, [2, 3])
         y_flip = self.internal_model(x_flip)
         y = torch.flip(y_flip, [1])
-        return (self.internal_model(x) + y)/2
+        return (self.internal_model(x) + y) / 2
 
 
 class Ouragent():
@@ -195,8 +195,8 @@ class Ouragent():
 
     def get_empty(self, state):
         indices = []
-        for x in range(self.board_size+4):
-            for y in range(self.board_size+4):
+        for x in range(self.board_size + 4):
+            for y in range(self.board_size + 4):
                 if (state[0, x, y] == 0 and state[1, x, y] == 0):
                     indices.append((x, y))
         return indices
@@ -212,7 +212,8 @@ class Ouragent():
         x = cell[0]
         y = cell[1]
         return [(n[0] + x, n[1] + y) for n in self.neighbor_patterns
-                if (0 <= n[0] + x and n[0] + x < self.board_size+4 and 0 <= n[1] + y and n[1] + y < self.board_size+4)]
+                if
+                (0 <= n[0] + x and n[0] + x < self.board_size + 4 and 0 <= n[1] + y and n[1] + y < self.board_size + 4)]
 
     def fill_connect(self, state, cell, color, checked):
         checked[cell] = True
@@ -245,9 +246,9 @@ class Ouragent():
     def resistance(self, state, empty, color):
         if self.board.has_ended():
             if self.board.get_winner() == color:
-                return np.zeros((self.board_size+4, self.board_size+4)), float("inf")
+                return np.zeros((self.board_size + 4, self.board_size + 4)), float("inf")
             else:
-                return np.zeros((self.board_size+4, self.board_size+4)), 0
+                return np.zeros((self.board_size + 4, self.board_size + 4)), 0
         index_to_location = empty
         num_empty = len(empty)
         location_to_index = {index_to_location[i]: i for i in range(num_empty)}
@@ -258,7 +259,7 @@ class Ouragent():
         I = np.zeros(num_empty)
         G = np.zeros((num_empty, num_empty))
 
-        checked = np.zeros((self.board_size+4, self.board_size+4), dtype=bool)
+        checked = np.zeros((self.board_size + 4, self.board_size + 4), dtype=bool)
         source_connected = self.fill_connect(state, (0, 0), n_color, checked)
         for n in source_connected:
             j = location_to_index[n]
@@ -266,7 +267,7 @@ class Ouragent():
             G[j, j] += 1
 
         dest_connected = self.fill_connect(
-            state, (self.board_size+3, self.board_size+3), n_color, checked)
+            state, (self.board_size + 3, self.board_size + 3), n_color, checked)
         for n in dest_connected:
             j = location_to_index[n]
             G[j, j] += 1
@@ -283,18 +284,18 @@ class Ouragent():
         except np.linalg.linalg.LinAlgError:
             V = np.linalg.lstsq(G, I)[0]
         C = 0
-        Il = np.zeros((self.board_size+4, self.board_size+4))
+        Il = np.zeros((self.board_size + 4, self.board_size + 4))
         for i in range(num_empty):
             if index_to_location[i] in source_connected:
-                Il[index_to_location[i]] += abs(V[i] - 1)/2
+                Il[index_to_location[i]] += abs(V[i] - 1) / 2
             if index_to_location[i] in dest_connected:
-                Il[index_to_location[i]] += abs(V[i])/2
+                Il[index_to_location[i]] += abs(V[i]) / 2
             for j in range(num_empty):
                 if (i != j and G[i, j] != 0):
-                    Il[index_to_location[i]] += abs(G[i, j]*(V[i] - V[j]))/2
+                    Il[index_to_location[i]] += abs(G[i, j] * (V[i] - V[j])) / 2
                     if (index_to_location[i] in source_connected and
-                       index_to_location[j] not in source_connected):
-                        C += -G[i, j]*(V[i] - V[j])
+                            index_to_location[j] not in source_connected):
+                        C += -G[i, j] * (V[i] - V[j])
         return Il, C
 
     def make_move(self):

@@ -166,15 +166,6 @@ class Ouragent():
                     self.make_move()
         return False
 
-    def swap_map(self):
-        x = self.last_move[0]
-        y = self.last_move[1]
-        if x == 0 and y < 10:
-            return False
-        if x == 10 and 0 < y:
-            return False
-        return True
-
     def tile_to_state(self, tile):
         colour = tile.get_colour()
         if colour == Colour.RED:
@@ -294,10 +285,9 @@ class Ouragent():
 
     def make_move(self):
         if self.colour == "B" and self.turn_count == 0:
-            if self.swap_map():
-                self.s.sendall(bytes("SWAP\n", "utf-8"))
-                self.turn_count += 1
-                return
+            self.s.sendall(bytes("SWAP\n", "utf-8"))
+            self.turn_count += 1
+            return
         if self.colour == "R" and self.turn_count == 0:
             good_choices = [[1, 2], [2, 0], [3, 0], [5, 0], [6, 0], [
                 7, 0], [8, 0], [10, 0], [2, 5], [1, 8], [0, 10]]
